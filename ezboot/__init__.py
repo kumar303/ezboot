@@ -34,6 +34,7 @@ from marionette.errors import TimeoutException
 import requests
 from requests.auth import HTTPBasicAuth
 
+CHUNK_SIZE = 1024 * 13
 
 def sh(cmd):
     return check_call(cmd, shell=True)
@@ -198,19 +199,23 @@ def flash_device(args):
         zn = os.path.basename(args.flash_url)
         res = requests.get(args.flash_url,
                            auth=HTTPBasicAuth(user, password), stream=True)
+        total_bytes = int(res.headers['content-length'])
         zipdest = open(os.path.basename(args.flash_url), 'wb')
         print 'Saving %s' % zipdest.name
         dots = 1
-        dir = ['.', ' ']
-        for chunk in res.iter_content(chunk_size=1024 * 13):
+        chars = ['.', ' ']
+        bytes_down = 0
+        for chunk in res.iter_content(chunk_size=CHUNK_SIZE):
+            bytes_down += CHUNK_SIZE
             zipdest.write(chunk)
-            sys.stdout.write("\r%s%s" % (dir[0] * dots,
-                                         dir[1] * (80 - dots)))
+            sys.stdout.write("\r%s%s %2.2f%%" % (chars[0] * dots,
+                                         chars[1] * (80 - dots),
+                                         100.0 * bytes_down / total_bytes))
             sys.stdout.flush()
             dots += 1
             if dots >= 80:
                 dots = 1
-                dir.reverse()
+                chars.reverse()
         print
         res.close()
         zipdest.close()
