@@ -1,3 +1,4 @@
+ezboot.ini
 *.py[co]
 *.sw[po]
 .DS_Store
