@@ -41,6 +41,12 @@ Requirements:
   Get it from the `Android SDK`_.
 * Some additional Python modules will be installed as dependencies
 
+Caveats:
+
+* You should not enable the Remote Debugging setting on B2G when
+  Marionette is enabled. This will create conflicting debugger listeners.
+  See https://bugzilla.mozilla.org/show_bug.cgi?id=764913 for info.
+
 .. _`Android SDK`: http://developer.android.com/sdk/index.html
 .. _`Firefox OS Simulator`: https://developer.mozilla.org/en-US/docs/Mozilla/Firefox_OS/Using_Firefox_OS_Simulator
 
