@@ -8,13 +8,13 @@ def local_file(fn):
 
 
 setup(name='ezboot',
-      version='1.0.0',
+      version='1.0.1',
       description="Automatically configure a Boot2Gecko Device. It's so ez!",
       long_description=local_file('README.rst').read(),
       author='Kumar McMillan',
       author_email='kumar.mcmillan@gmail.com',
       license='Apache 2',
-      url='',
+      url='https://github.com/kumar303/ezboot',
       include_package_data=True,
       classifiers=[],
       entry_points="""
