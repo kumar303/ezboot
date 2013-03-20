@@ -138,7 +138,7 @@ def set_up_device(args):
             wait_for_element_displayed(mc, 'id', 'system-banner')
 
     if args.custom_prefs and os.path.exists(args.custom_prefs):
-        print 'Pushing payment prefs from %s' % args.custom_prefs
+        print 'Pushing custom prefs from %s' % args.custom_prefs
         sh('adb shell stop b2g')
         try:
             sh('adb push "%s" /data/local/user.js' % args.custom_prefs)
