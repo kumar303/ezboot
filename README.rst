@@ -20,12 +20,18 @@ Features:
 * You can use a config file for everything
 * Frictionless convention over configuration
 
+Do you really need this? Probably not! You should try the
+`Firefox OS Simulator`_ first. There are some device
+interaction features coming very soon to the simulator
+that will hopefully make this script obsolete.
+
 Requirements:
 
-* Mac or Linux. Windows could be supported but prepare to send patches.
+* Mac or Linux.
 
   * On Mac you might need to install XCode with Command Line Tools
     from https://developer.apple.com/downloads/
+  * Windows could be supported but prepare to send patches.
 
 * You *must* use a build of B2G that has Marionette enabled.
   More details below.
@@ -35,6 +41,7 @@ Requirements:
 * Some additional Python modules will be installed as dependencies
 
 .. _`Android SDK`: http://developer.android.com/sdk/index.html
+.. _`Firefox OS Simulator`: https://developer.mozilla.org/en-US/docs/Mozilla/Firefox_OS/Using_Firefox_OS_Simulator
 
 Contents:
 
