@@ -91,6 +91,19 @@ B2G with Marionette support yourself.
 .. _`Marionette`: https://developer.mozilla.org/en-US/docs/Marionette
 .. _`Read this`: https://developer.mozilla.org/en-US/docs/Marionette/Setup
 
+First Timers
+------------
+
+You'll try anything at least once, right? The very *first* time you run
+``ezboot flash`` you probably need to enable Remote Debugging first by
+digging into
+Settings > Device Information > More Information > Developer.
+Otherwise, ``adb`` won't be able to connect.
+This only applies if you had flashed with a B2G build that did not have
+Marionette enabled.
+If you've never installed B2G at all then you need to enable debugger
+connections on Android.
+
 Usage
 =====
 
