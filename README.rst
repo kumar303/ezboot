@@ -23,6 +23,7 @@ Features:
 Do you really need this? Probably not! You should try the
 `Firefox OS Simulator`_ first. There are some device
 interaction features coming very soon to the simulator
+(such as Push To Device)
 that will hopefully make this script obsolete.
 
 Requirements:
