@@ -333,6 +333,14 @@ http://developer.android.com/sdk/index.html
     # if there is only one item.
     if args.apps and isinstance(args.apps, basestring):
         args.apps = [args.apps]
+    if not args.apps:
+        args.apps = []
+
+    # This should cut down on any sad face errors that
+    # might happen after, oh, say, downloading 180MB.
+    print 'Waiting for your device (is it plugged in?)'
+    sh('adb wait-for-device')
+    print 'found it'
 
     args.func(args)
 
