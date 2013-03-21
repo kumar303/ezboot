@@ -153,15 +153,17 @@ def http_log_restart(args):
     sh('adb shell stop b2g')
     print "restarting with HTTP logging enabled"
     print "press control+C to quit"
-    sh('adb shell rm /data/local/tmp/http.log')
+    device_log = '/data/local/ezboot-http.log'
+    sh('adb shell rm %s' % device_log)
     p = subprocess.Popen("""adb shell <<SHELL
 #export NSPR_LOG_MODULES=timestamp,nsHttp:5,nsSocketTransport:5,nsHostResolver:5
 export NSPR_LOG_MODULES=nsHttp:3
-export NSPR_LOG_FILE=/data/local/tmp/http.log
+export NSPR_LOG_FILE=%s
 /system/bin/b2g.sh
 
 SHELL
-        """, shell=True)
+        """ % device_log,
+        shell=True)
     try:
         print 'Get output with adb logcat'
         p.wait()
@@ -171,9 +173,9 @@ SHELL
 
     tmp = tempfile.gettempdir()
     os.chdir(tmp)
-    sh('adb pull /data/local/tmp/http.log')
+    sh('adb pull %s' % device_log)
     print '*' * 80
-    print 'Log file: %s/http.log' % tmp
+    print 'Log file: %s/%s' % (tmp, os.path.basename(device_log))
     print '*' * 80
     sh('adb reboot')
 
@@ -331,10 +333,11 @@ http://developer.android.com/sdk/index.html
 
     # Hmm. This is tricky. The config file won't give us a list
     # if there is only one item.
-    if args.apps and isinstance(args.apps, basestring):
-        args.apps = [args.apps]
-    if not args.apps:
-        args.apps = []
+    if hasattr(args, 'apps'):
+        if args.apps and isinstance(args.apps, basestring):
+            args.apps = [args.apps]
+        if not args.apps:
+            args.apps = []
 
     # This should cut down on any sad face errors that
     # might happen after, oh, say, downloading 180MB.
