@@ -141,7 +141,7 @@ Here is a full reference::
 
     ezboot flash --help
 
-The defaults will probably do what you want. If you don't want
+The defaults will probably work for you. If you don't want
 to be prompted for your username/password each time, you can save
 them in an ``ezboot.ini`` config file::
 
@@ -158,11 +158,11 @@ This sets up your flashed device for usage. Here is the full reference::
 
     ezboot setup --help
 
-It does all this when the corresponding options have values:
+It can do the following:
 
-* configures WiFi
-* pre-installs some apps
-* puts custom prefs on the device
+* configure WiFi
+* pre-install some apps
+* put custom prefs on the device
 
 The ``--apps`` argument takes multiple values. In a config file, add them
 one per line in an ``ezboot.ini`` config file like this::
@@ -174,9 +174,10 @@ one per line in an ``ezboot.ini`` config file like this::
     wifi_key = WPA-PSK
     wifi_pass = ...
 
-By convention, if you put a config file in ``./ezboot/custom-prefs.js``
+By convention, if you put a custom prefs file in ``./ezboot/custom-prefs.js``
 where dot is the working directory then it will be pushed to
-``/data/local/user.js`` on the device.
+``/data/local/user.js`` on the device. Any existing custom prefs are not
+preserved.
 
 http
 ----
@@ -199,5 +200,5 @@ While automated functional tests are fantastic I also want to make sure
 developers are testing their changes manually on real devices with the
 latest builds. It's a pain to maintain a development device yourself
 so this created an itch that had to be scratched.
-There is some prior art on B2G scripts but they had different goals or
+There is plenty of prior art on B2G scripts but each had different goals or
 they were done with cryptic bash magic.
