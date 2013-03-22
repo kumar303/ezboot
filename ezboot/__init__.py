@@ -135,6 +135,8 @@ def set_up_device(args):
                 wait_for_element_displayed(mc, 'id', 'app-install-install-button')
                 yes = mc.find_element('id', 'app-install-install-button')
                 mc.tap(yes)
+                # This still works but the id check broke.
+                # See https://bugzilla.mozilla.org/show_bug.cgi?id=853878
                 wait_for_element_displayed(mc, 'id', 'system-banner')
         except Exception, exc:
             print ' ** installing manifest %s failed (maybe?)' % manifest
