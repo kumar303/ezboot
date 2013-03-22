@@ -208,6 +208,10 @@ def download_build(args):
         print 'In %s' % dest
         res = requests.get(args.flash_url,
                            auth=HTTPBasicAuth(user, password), stream=True)
+        if res.status_code != 200:
+            args.error('Got %s from %s (Is your password correct? '
+                       'Is the URL correct?)' % (res.status_code,
+                                                 args.flash_url))
         total_bytes = int(res.headers['content-length'])
         zipdest = open(os.path.basename(args.flash_url), 'wb')
         print 'Saving %s' % zipdest.name
