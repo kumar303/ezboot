@@ -17,6 +17,7 @@ For example:
 """
 import argparse
 import ConfigParser
+from contextlib import contextmanager
 from getpass import getpass
 import os
 import socket
@@ -25,6 +26,7 @@ import subprocess
 from subprocess import check_call
 import sys
 import time
+import xml.etree.ElementTree as ET
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
 from marionette import Marionette, MarionetteTouchMixin
@@ -40,7 +42,7 @@ def sh(cmd):
     return check_call(cmd, shell=True)
 
 
-def wait_for_element_displayed(mc, by, locator, timeout=8):
+def wait_for_element_displayed(mc, by, locator, timeout=10):
     timeout = float(timeout) + time.time()
 
     while time.time() < timeout:
@@ -76,8 +78,12 @@ def get_installed(apps):
     return res
 
 
+class MarionetteWithTouch(Marionette, MarionetteTouchMixin):
+    pass
+
+
 def set_up_device(args):
-    mc = Marionette('localhost', args.adb_port)
+    mc = MarionetteWithTouch('localhost', args.adb_port)
     for i in range(3):
         try:
             mc.start_session()
@@ -85,8 +91,6 @@ def set_up_device(args):
         except socket.error:
             sh('adb forward tcp:%s tcp:%s' % (args.adb_port, args.adb_port))
 
-    # Look away! This is how gaiatest did it. *shrug*
-    mc.__class__ = type('Marionette', (Marionette, MarionetteTouchMixin), {})
     device = GaiaDevice(mc)
 
     device.restart_b2g()
@@ -101,8 +105,8 @@ def set_up_device(args):
 
     if args.wifi_ssid:
         print 'Configuring WiFi'
-        assert args.wifi_key and args.wifi_pass, (
-            'Missing --wifi_key and --wifi_pass options')
+        if not args.wifi_key or not args.wifi_pass:
+            args.error('Missing --wifi_key or --wifi_pass option')
         args.wifi_key = args.wifi_key.upper()
 
         data_layer.enable_wifi()
@@ -111,32 +115,31 @@ def set_up_device(args):
         elif args.wifi_key == 'WEP':
             pass_key = 'wep'
         else:
-            assert 0, 'not sure what key to use for %r' % args.wifi_key
+            args.error('not sure what key to use for %r' % args.wifi_key)
 
         data = {'ssid': args.wifi_ssid, 'keyManagement': args.wifi_key,
                 pass_key: args.wifi_pass}
         data_layer.connect_to_wifi(data)
 
-    print 'Installing these apps: %s' % (args.apps or None)
     for manifest in args.apps:
         # There is probably a way easier way to do this by adb pushing
         # something. Send me a patch!
         mc.switch_to_frame()
         try:
             data = requests.get(manifest).json()
+            app_name = data['name']
+            all_apps = set(a['manifest']['name'] for a in get_installed(apps))
+            if app_name not in all_apps:
+                print 'Installing %s from %s' % (app_name, manifest)
+                mc.execute_script('navigator.mozApps.install("%s");' % manifest)
+                wait_for_element_displayed(mc, 'id', 'app-install-install-button')
+                yes = mc.find_element('id', 'app-install-install-button')
+                mc.tap(yes)
+                wait_for_element_displayed(mc, 'id', 'system-banner')
         except Exception, exc:
-            print ' ** mainfest %s failed' % manifest
-            print ' ** requests error: %s: %s' % (exc.__class__.__name__,
-                                                  exc)
+            print ' ** installing manifest %s failed (maybe?)' % manifest
+            print ' ** error: %s: %s' % (exc.__class__.__name__, exc)
             continue
-        app_name = data['name']
-        all_apps = set(a['manifest']['name'] for a in get_installed(apps))
-        if app_name not in all_apps:
-            mc.execute_script('navigator.mozApps.install("%s");' % manifest)
-            wait_for_element_displayed(mc, 'id', 'app-install-install-button')
-            yes = mc.find_element('id', 'app-install-install-button')
-            mc.tap(yes)
-            wait_for_element_displayed(mc, 'id', 'system-banner')
 
     if args.custom_prefs and os.path.exists(args.custom_prefs):
         print 'Pushing custom prefs from %s' % args.custom_prefs
@@ -180,6 +183,11 @@ SHELL
 
 
 def flash_device(args):
+    download_build(args)
+    flash_last_dl(args)
+
+
+def download_build(args):
     print 'Downloading %s' % args.flash_url
 
     user = args.flash_user
@@ -196,9 +204,7 @@ def flash_device(args):
     if os.path.exists(dest):
         shutil.rmtree(dest)
     os.mkdir(dest)
-    wd = os.getcwd()
-    try:
-        os.chdir(dest)
+    with pushd(dest):
         print 'In %s' % dest
         res = requests.get(args.flash_url,
                            auth=HTTPBasicAuth(user, password), stream=True)
@@ -219,14 +225,48 @@ def flash_device(args):
             if dots >= 80:
                 dots = 1
                 chars.reverse()
-        print
+        print ''  # finish progress indicator
         res.close()
         zipdest.close()
 
         sh('unzip %s' % zipdest.name)
-        os.chdir('b2g-distro')
+
+
+def flash_last_dl(args):
+    dest = os.path.join(args.work_dir, 'last-build', 'b2g-distro')
+    if not os.path.exists(dest):
+        args.error('No build to flash. Did you run flash?')
+
+    root = ET.parse(os.path.join(dest, 'sources.xml')).getroot()
+    remotes = {}
+    for rem in root.findall('./remote'):
+        url = rem.attrib['fetch']
+        if url.endswith('releases'):
+            # Bah! The URL is wrong for web viewing. Strip off the /releases
+            parts = url.split('/')
+            url = '/'.join(parts[:-1])
+        remotes[rem.attrib['name']] = url
+
+    print 'Build info:'
+    for pj in ('gecko', 'gaia'):
+        for el in root.findall("./project[@path='%s']" % pj):
+            # E.G. https://git.mozilla.org/?p=releases/gaia.git;a=commitdiff
+            #        ;h=5a31a56b96a8fc559232d35dabf20411b9c2ca1d
+            print '  %s/?p=releases/%s;a=commitdiff;h=%s' % (
+                            remotes[el.attrib['remote']],
+                            el.attrib['name'],
+                            el.attrib['revision'])
+
+    with pushd(dest):
         sh('./flash.sh')
 
+
+@contextmanager
+def pushd(newdir):
+    wd = os.getcwd()
+    try:
+        os.chdir(newdir)
+        yield
     finally:
         os.chdir(wd)
 
@@ -299,6 +339,10 @@ def main():
                             'empty')
     flash.set_defaults(func=flash_device)
 
+    reflash = sub_parser('reflash', help='Re-flash the last build you '
+                                         'downloaded')
+    reflash.set_defaults(func=flash_last_dl)
+
     setup = sub_parser('setup', help='Set up a flashed device for usage')
     setup.add_argument('--adb_port', default=2828, type=int,
                        help='adb port to forward on the device.')
@@ -319,8 +363,7 @@ def main():
 
     http = sub_parser('http',
                       help='Restart the device with HTTP logging '
-                           'enabled. This assumes you previously '
-                           'set up the device.')
+                           'enabled.')
     http.set_defaults(func=http_log_restart)
 
     args = cmd.parse_args(remaining_argv)
@@ -346,6 +389,9 @@ http://developer.android.com/sdk/index.html
         args.work_dir = os.path.expanduser(args.work_dir)
         if not os.path.exists(args.work_dir):
             os.mkdir(args.work_dir)
+
+    # Make it easier for handlers to raise parser errors.
+    args.error = cmd.error
 
     # This should cut down on any sad face errors that
     # might happen after, oh, say, downloading 180MB.
