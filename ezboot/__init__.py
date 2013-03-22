@@ -26,6 +26,7 @@ import subprocess
 from subprocess import check_call
 import sys
 import time
+import traceback
 import xml.etree.ElementTree as ET
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
@@ -243,25 +244,31 @@ def flash_last_dl(args):
     if not os.path.exists(dest):
         args.error('No build to flash. Did you run flash?')
 
-    root = ET.parse(os.path.join(dest, 'sources.xml')).getroot()
-    remotes = {}
-    for rem in root.findall('./remote'):
-        url = rem.attrib['fetch']
-        if url.endswith('releases'):
-            # Bah! The URL is wrong for web viewing. Strip off the /releases
-            parts = url.split('/')
-            url = '/'.join(parts[:-1])
-        remotes[rem.attrib['name']] = url
+    try:
+        root = ET.parse(os.path.join(dest, 'sources.xml')).getroot()
+        remotes = {}
+        for rem in root.findall('./remote'):
+            url = rem.attrib['fetch']
+            if url.endswith('releases'):
+                # Bah! The URL is wrong for web viewing.
+                # Strip off the /releases
+                parts = url.split('/')
+                url = '/'.join(parts[:-1])
+            remotes[rem.attrib['name']] = url
 
-    print 'Build info:'
-    for pj in ('gecko', 'gaia'):
-        for el in root.findall("./project[@path='%s']" % pj):
-            # E.G. https://git.mozilla.org/?p=releases/gaia.git;a=commitdiff
-            #        ;h=5a31a56b96a8fc559232d35dabf20411b9c2ca1d
-            print '  %s/?p=releases/%s;a=commitdiff;h=%s' % (
-                            remotes[el.attrib['remote']],
-                            el.attrib['name'],
-                            el.attrib['revision'])
+        print 'Build info:'
+        for pj in ('gecko', 'gaia'):
+            for el in root.findall("./project[@path='%s']" % pj):
+                # E.G. https://git.mozilla.org/?p=releases/gaia.git
+                #        ;a=commitdiff
+                #        ;h=5a31a56b96a8fc559232d35dabf20411b9c2ca1d
+                print '  %s/?p=releases/%s;a=commitdiff;h=%s' % (
+                                remotes[el.attrib['remote']],
+                                el.attrib['name'],
+                                el.attrib['revision'])
+    except Exception:
+        traceback.print_exc()
+        print ' ** could not get build info'
 
     with pushd(dest):
         sh('./flash.sh')
