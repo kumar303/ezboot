@@ -24,7 +24,6 @@ import shutil
 import subprocess
 from subprocess import check_call
 import sys
-import tempfile
 import time
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
@@ -35,6 +34,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 CHUNK_SIZE = 1024 * 13
+
 
 def sh(cmd):
     return check_call(cmd, shell=True)
@@ -171,11 +171,10 @@ SHELL
         p.kill()
         p.wait()
 
-    tmp = tempfile.gettempdir()
-    os.chdir(tmp)
+    os.chdir(args.work_dir)
     sh('adb pull %s' % device_log)
     print '*' * 80
-    print 'Log file: %s/%s' % (tmp, os.path.basename(device_log))
+    print 'Log file: %s/%s' % (args.work_dir, os.path.basename(device_log))
     print '*' * 80
     sh('adb reboot')
 
@@ -193,12 +192,14 @@ def flash_device(args):
             if raw_input('OK? y/n ').strip().startswith('y'):
                 done = True
 
-    dest = tempfile.mkdtemp(prefix='ezboot_')
+    dest = os.path.join(args.work_dir, 'last-build')
+    if os.path.exists(dest):
+        shutil.rmtree(dest)
+    os.mkdir(dest)
     wd = os.getcwd()
     try:
         os.chdir(dest)
         print 'In %s' % dest
-        zn = os.path.basename(args.flash_url)
         res = requests.get(args.flash_url,
                            auth=HTTPBasicAuth(user, password), stream=True)
         total_bytes = int(res.headers['content-length'])
@@ -227,7 +228,6 @@ def flash_device(args):
         sh('./flash.sh')
 
     finally:
-        shutil.rmtree(dest)
         os.chdir(wd)
 
 
@@ -264,6 +264,8 @@ def main():
     cmd = argparse.ArgumentParser(description=__doc__,
                                   parents=[conf_parser],
                                   formatter_class=Formatter)
+    cmd.add_argument('--work_dir', default='~/.ezboot',
+                     help='Working directory to save/delete temp data')
 
     sub = cmd.add_subparsers(help='sub-command help')
 
@@ -293,7 +295,8 @@ def main():
                        help='Username for build URL. It will prompt '
                             'when empty')
     flash.add_argument('--flash_pass',
-                       help='Password for build URL. It will prompt when empty')
+                       help='Password for build URL. It will prompt when '
+                            'empty')
     flash.set_defaults(func=flash_device)
 
     setup = sub_parser('setup', help='Set up a flashed device for usage')
@@ -338,6 +341,11 @@ http://developer.android.com/sdk/index.html
             args.apps = [args.apps]
         if not args.apps:
             args.apps = []
+
+    if hasattr(args, 'work_dir'):
+        args.work_dir = os.path.expanduser(args.work_dir)
+        if not os.path.exists(args.work_dir):
+            os.mkdir(args.work_dir)
 
     # This should cut down on any sad face errors that
     # might happen after, oh, say, downloading 180MB.
