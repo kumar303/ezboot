@@ -239,11 +239,22 @@ def download_build(args):
         sh('unzip %s' % zipdest.name)
 
 
-def flash_last_dl(args):
+def get_b2g_distro(args):
     dest = os.path.join(args.work_dir, 'last-build', 'b2g-distro')
     if not os.path.exists(dest):
         args.error('No build to flash. Did you run flash?')
+    return dest
 
+
+def flash_last_dl(args):
+    dest = get_b2g_distro(args)
+    show_build_info(args)
+    with pushd(dest):
+        sh('./flash.sh')
+
+
+def show_build_info(args):
+    dest = get_b2g_distro(args)
     try:
         root = ET.parse(os.path.join(dest, 'sources.xml')).getroot()
         remotes = {}
@@ -269,9 +280,6 @@ def flash_last_dl(args):
     except Exception:
         traceback.print_exc()
         print ' ** could not get build info'
-
-    with pushd(dest):
-        sh('./flash.sh')
 
 
 @contextmanager
@@ -378,6 +386,11 @@ def main():
                       help='Restart the device with HTTP logging '
                            'enabled.')
     http.set_defaults(func=http_log_restart)
+
+    info = sub_parser('info', help='Show info of last ezboot-downloaded '
+                                   'build. This may not be exactly what is '
+                                   'on your device.')
+    info.set_defaults(func=show_build_info)
 
     args = cmd.parse_args(remaining_argv)
 
