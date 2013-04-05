@@ -58,6 +58,37 @@ def wait_for_element_displayed(mc, by, locator, timeout=10):
             'Element %s not visible before timeout' % locator)
 
 
+def wait_for_element_present(mc, by, locator, timeout=10):
+    timeout = float(timeout) + time.time()
+
+    while time.time() < timeout:
+        time.sleep(0.5)
+        try:
+            return mc.find_element(by, locator)
+        except NoSuchElementException:
+            pass
+    else:
+        raise TimeoutException(
+            'Element %s not found before timeout' % locator)
+
+
+def wait_for_condition(mc, method, timeout=10,
+                       message="Condition timed out"):
+    """Calls the method provided with the driver as an argument until the
+    return value is not False."""
+    end_time = time.time() + timeout
+    while time.time() < end_time:
+        try:
+            value = method(mc)
+            if value:
+                return value
+        except NoSuchElementException:
+            pass
+        time.sleep(0.5)
+    else:
+        raise TimeoutException(message)
+
+
 def get_installed(apps):
     apps.marionette.switch_to_frame()
     res = apps.marionette.execute_async_script("""
@@ -83,7 +114,7 @@ class MarionetteWithTouch(Marionette, MarionetteTouchMixin):
     pass
 
 
-def set_up_device(args):
+def get_marionette(args):
     mc = MarionetteWithTouch('localhost', args.adb_port)
     for i in range(3):
         try:
@@ -91,9 +122,12 @@ def set_up_device(args):
             break
         except socket.error:
             sh('adb forward tcp:%s tcp:%s' % (args.adb_port, args.adb_port))
+    return mc
 
+
+def set_up_device(args):
+    mc = get_marionette(args)
     device = GaiaDevice(mc)
-
     device.restart_b2g()
 
     apps = GaiaApps(mc)
@@ -282,6 +316,80 @@ def show_build_info(args):
         print ' ** could not get build info'
 
 
+def do_login(args):
+    mc = get_marionette(args)
+    device = GaiaDevice(mc)
+    apps = GaiaApps(mc)
+    data_layer = GaiaData(mc)
+    mc.setup_touch()
+
+    _persona_frame_locator = ('css selector', "iframe")
+
+    # Trusty UI on home screen
+    _tui_container_locator = ('id', 'trustedui-frame-container')
+
+    # Persona dialog
+    _waiting_locator = ('css selector', 'body.waiting')
+    _email_input_locator = ('id', 'authentication_email')
+    _password_input_locator = ('id', 'authentication_password')
+    _new_password = ('id', 'password')
+    _verify_new_password = ('id', 'vpassword')
+    _next_button_locator = ('css selector', 'button.start')
+    _verify_start_button = ('css selector', 'button#verify_user')
+    _returning_button_locator = ('css selector', 'button.returning')
+    _sign_in_button_locator = ('id', 'signInButton')
+    _this_session_only_button_locator = ('id', 'this_is_not_my_computer')
+
+    # Switch to top level frame then Persona frame
+    mc.switch_to_frame()
+    wait_for_element_present(mc, *_tui_container_locator)
+    trustyUI = mc.find_element(*_tui_container_locator)
+    wait_for_condition(mc, lambda m: trustyUI.find_element(*_persona_frame_locator))
+    personaDialog = trustyUI.find_element(*_persona_frame_locator)
+    mc.switch_to_frame(personaDialog)
+
+    try:
+        ready = mc.find_element(*_email_input_locator).is_displayed()
+    except NoSuchElementException:
+        ready = False
+    if not ready:
+        print 'Persona email input is not present.'
+        print 'Are you on a new login screen?'
+        return
+
+    done = False
+    while not done:
+        username = raw_input('Persona username: ')
+        password = getpass('password: ')
+        if raw_input('OK? y/n ').strip().startswith('y'):
+            done = True
+
+    email_field = mc.find_element(*_email_input_locator)
+    email_field.send_keys(username)
+
+    #mc.tap(mc.find_element(*_next_button_locator)) #.click()
+    mc.find_element(*_next_button_locator).click()
+
+    try:
+        wait_for_element_displayed(mc, *_new_password)
+        # Creating a new account:
+        password_field = mc.find_element(*_new_password)
+        password_field.send_keys(password)
+        v_password = mc.find_element(*_verify_new_password)
+        v_password.send_keys(password)
+        wait_for_element_displayed(mc, *_verify_start_button)
+        mc.tap(mc.find_element(*_verify_start_button)) #.click()
+    except TimeoutException:
+        print 'Not a new account? Trying to log in to existing account'
+        # Logging into an exisiting account:
+        password_field = mc.find_element(*_password_input_locator)
+        password_field.send_keys(password)
+        wait_for_element_displayed(mc, *_returning_button_locator)
+        mc.tap(mc.find_element(*_returning_button_locator)) #.click()
+
+    print 'You should be logged in now'
+
+
 @contextmanager
 def pushd(newdir):
     wd = os.getcwd()
@@ -327,6 +435,9 @@ def main():
                                   formatter_class=Formatter)
     cmd.add_argument('--work_dir', default='~/.ezboot',
                      help='Working directory to save/delete temp data')
+    cmd.add_argument('--adb_port', default=2828, type=int,
+                     help='adb port to forward on the device. '
+                          'Marionette will then connect to this port.')
 
     sub = cmd.add_subparsers(help='sub-command help')
 
@@ -365,8 +476,6 @@ def main():
     reflash.set_defaults(func=flash_last_dl)
 
     setup = sub_parser('setup', help='Set up a flashed device for usage')
-    setup.add_argument('--adb_port', default=2828, type=int,
-                       help='adb port to forward on the device.')
     setup.add_argument('--wifi_ssid', help='WiFi SSID to connect to')
     setup.add_argument('--wifi_key', choices=['WPA-PSK', 'WEP'],
                        help='WiFi key management.')
@@ -391,6 +500,11 @@ def main():
                                    'build. This may not be exactly what is '
                                    'on your device.')
     info.set_defaults(func=show_build_info)
+
+    login = sub_parser('login', help='Enter Persona login username/password. '
+                                     'You must have a login prompt open '
+                                     'on your device.')
+    login.set_defaults(func=do_login)
 
     args = cmd.parse_args(remaining_argv)
 

@@ -193,6 +193,21 @@ requests/responses. When you view the file it might warn you that it
 has binary content but that's typically just at the beginning of the file.
 Keep paging.
 
+login
+-----
+
+Make sure a `Persona`_ screen is open on the device then type
+``ezboot login``. Here is a reference::
+
+    ezboot login --help
+
+This lets you type the username / password to a new Persona account from
+your nice desktop keyboard instead of the device keypad. In a real world
+situation this wouldn't be as annoying since Persona remembers who you are
+but for development you'll be typing new accounts all the time for testing.
+
+.. _Persona: https://login.persona.org/
+
 Why?
 ====
 
