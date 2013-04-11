@@ -208,6 +208,14 @@ but for development you'll be typing new accounts all the time for testing.
 
 .. _Persona: https://login.persona.org/
 
+kill
+----
+
+This kills all running apps which may be useful when you need to reload
+styles, js or other assets.::
+
+    ezboot kill --help
+
 Why?
 ====
 

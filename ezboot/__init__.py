@@ -287,6 +287,14 @@ def flash_last_dl(args):
         sh('./flash.sh')
 
 
+def kill_all_apps(args):
+    mc = get_marionette(args)
+    mc.setup_touch()
+    apps = GaiaApps(mc)
+    apps.kill_all()
+    print 'Killed all apps'
+
+
 def show_build_info(args):
     dest = get_b2g_distro(args)
     try:
@@ -505,6 +513,10 @@ def main():
                                      'You must have a login prompt open '
                                      'on your device.')
     login.set_defaults(func=do_login)
+
+    kill = sub_parser('kill',
+                      help='Kill all running apps.')
+    kill.set_defaults(func=kill_all_apps)
 
     args = cmd.parse_args(remaining_argv)
 
