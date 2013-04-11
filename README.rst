@@ -212,9 +212,20 @@ kill
 ----
 
 This kills all running apps which may be useful when you need to reload
-styles, js or other assets.::
+styles, js or other assets.
+
+::
 
     ezboot kill --help
+
+The ``recss`` command might be faster.
+
+recss
+-----
+
+This reloads all stylesheets on the current frame. More info::
+
+    ezboot recss --help
 
 Why?
 ====

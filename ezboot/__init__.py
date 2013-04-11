@@ -295,6 +295,28 @@ def kill_all_apps(args):
     print 'Killed all apps'
 
 
+def do_recss(args):
+    mc = get_marionette(args)
+    # From : http://david.dojotoolkit.org/recss.html
+    js = """
+function _doReCSS() {
+    var i, a, s;
+    a = document.getElementsByTagName('link');
+    for (i = 0; i < a.length; i++) {
+        s = a[i];
+        if (s.rel.toLowerCase().indexOf('stylesheet') >= 0 && s.href) {
+            var h = s.href.replace(/(&|\\?)forceReload=\\d+/, '');
+            s.href = h + (h.indexOf('?') >= 0 ? '&' : '?') + 'forceReload=' + (new Date().valueOf())
+        }
+    }
+};
+_doReCSS();
+    """
+    mc.switch_to_frame()
+    mc.execute_script(js)
+    print 'Reset CSS'
+
+
 def show_build_info(args):
     dest = get_b2g_distro(args)
     try:
@@ -517,6 +539,9 @@ def main():
     kill = sub_parser('kill',
                       help='Kill all running apps.')
     kill.set_defaults(func=kill_all_apps)
+
+    recss = sub_parser('recss', help='Reload all stylesheets.')
+    recss.set_defaults(func=do_recss)
 
     args = cmd.parse_args(remaining_argv)
 
