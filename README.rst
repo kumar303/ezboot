@@ -37,6 +37,12 @@ Requirements:
 * You *must* use a build of B2G that has Marionette enabled.
   More details below.
 * Python 2.7 or greater (Python 3 isn't suported yet)
+* The `pip`_ command to install Python packages
+
+  * The best way to set up Python and `pip`_ on Mac is to use
+    `homebrew`_. Once homebrew is installed type
+    ``brew install python``. This will give you the ``pip`` command.
+
 * ``adb`` needs to be on your ``$PATH``.
   Get it from the `Android SDK`_.
 * Some additional Python modules will be installed as dependencies
@@ -49,6 +55,7 @@ Caveats:
 
 .. _`Android SDK`: http://developer.android.com/sdk/index.html
 .. _`Firefox OS Simulator`: https://developer.mozilla.org/en-US/docs/Mozilla/Firefox_OS/Using_Firefox_OS_Simulator
+.. _`homebrew`: http://mxcl.github.com/homebrew/
 
 Contents:
 
