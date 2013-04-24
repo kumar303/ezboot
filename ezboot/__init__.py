@@ -120,7 +120,10 @@ def get_marionette(args):
         try:
             mc.start_session()
             break
-        except socket.error:
+        # Catching SystemExit because tracebacks are suppressed.
+        # This won't be necessary after
+        # https://bugzilla.mozilla.org/show_bug.cgi?id=863377
+        except (socket.error, SystemExit):
             sh('adb forward tcp:%s tcp:%s' % (args.adb_port, args.adb_port))
     return mc
 
