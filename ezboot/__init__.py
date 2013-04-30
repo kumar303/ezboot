@@ -19,6 +19,7 @@ import argparse
 import ConfigParser
 from contextlib import contextmanager
 from getpass import getpass
+import json
 import os
 import socket
 import shutil
@@ -27,6 +28,7 @@ from subprocess import check_call
 import sys
 import time
 import traceback
+from urlparse import urlparse
 import xml.etree.ElementTree as ET
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
@@ -131,7 +133,7 @@ def get_marionette(args):
 def set_up_device(args):
     mc = get_marionette(args)
     device = GaiaDevice(mc)
-    device.restart_b2g()
+    #device.restart_b2g()
 
     apps = GaiaApps(mc)
     data_layer = GaiaData(mc)
@@ -160,23 +162,47 @@ def set_up_device(args):
         data_layer.connect_to_wifi(data)
 
     for manifest in args.apps:
-        # There is probably a way easier way to do this by adb pushing
-        # something. Send me a patch!
-        mc.switch_to_frame()
         try:
             data = requests.get(manifest).json()
             app_name = data['name']
+            parts = urlparse(manifest)
+            port = ':%s' % parts.port if parts.port else ''
+            origin = parts.scheme + '://' + parts.netloc + port
             all_apps = set(a['manifest']['name'] for a in get_installed(apps))
+            mc.switch_to_frame()
             if app_name not in all_apps:
-                print 'Installing %s from %s' % (app_name, manifest)
-                mc.execute_script('navigator.mozApps.install("%s");' % manifest)
-                wait_for_element_displayed(mc, 'id', 'app-install-install-button')
-                yes = mc.find_element('id', 'app-install-install-button')
-                mc.tap(yes)
-                # This still works but the id check broke.
-                # See https://bugzilla.mozilla.org/show_bug.cgi?id=853878
-                wait_for_element_displayed(mc, 'id', 'system-banner')
+                print 'Installing %s from %s (origin=%s)' % (app_name, manifest,
+                                                             origin)
+                js = '''\
+                  let PermissionsInstaller =
+                      Components.utils.import("resource://gre/modules/PermissionsInstaller.jsm").
+                      PermissionsInstaller;
+                  PermissionsInstaller.installPermissions(
+                    {
+                      manifest: %(manifest)s,
+                      manifestURL: %(manifest_url)s,
+                      origin: %(manifest_origin)s
+                    },
+                    false, // isReinstall, installation failed for true
+                    function(e) {
+                      console.error("PermissionInstaller FAILED for " +
+                                    %(manifest_origin)s);
+                    }
+                  );''' % {'manifest': json.dumps(data),
+                           'manifest_url': json.dumps(manifest),
+                           'manifest_origin': json.dumps(origin)}
+                mc.set_context(mc.CONTEXT_CHROME)
+                try:
+                    mc.execute_script(js)
+                finally:
+                    mc.set_context(mc.CONTEXT_CONTENT)
+            while 1:
+                all_apps = set(a['manifest']['name'] for a in get_installed(apps))
+                print all_apps
+                import time
+                time.sleep(2)
         except Exception, exc:
+            raise
             print ' ** installing manifest %s failed (maybe?)' % manifest
             print ' ** error: %s: %s' % (exc.__class__.__name__, exc)
             continue
