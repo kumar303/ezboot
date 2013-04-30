@@ -491,8 +491,8 @@ def main():
         return sub.add_parser(action, help=help, description=help, **kw)
 
     flash = sub_parser('flash', help='Download a build and flash it')
-    u = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly/'
-         'mozilla-b2g18-unagi-eng/latest/unagi.zip')
+    u = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
+         '/mozilla-b2g18_v1_0_1-unagi/latest/unagi.zip')
     flash.add_argument('--flash_url', default=u,
                        help='URL of B2G build to flash. '
                             'This requires a username/password.')
