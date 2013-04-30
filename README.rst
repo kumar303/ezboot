@@ -186,6 +186,22 @@ where dot is the working directory then it will be pushed to
 ``/data/local/user.js`` on the device. Any existing custom prefs are not
 preserved.
 
+dl
+--
+
+This downloads a build and saves the Zip file to a custom directory.
+The build will not be flashed to a
+device and any subsequent ``reflash`` command will not attempt to use
+it. This is just a convenient way to grab a build without logging in;
+the same user/pass options from ``flash`` apply here.
+
+Here is a full reference::
+
+    ezboot dl --help
+
+You can set a custom location with ``ezboot dl --location=...``.
+By default it will save builds to ``~/Downloads``.
+
 http
 ----
 

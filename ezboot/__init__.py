@@ -227,7 +227,15 @@ def flash_device(args):
     flash_last_dl(args)
 
 
-def download_build(args):
+def download_and_save_build(args):
+    if not os.path.exists(args.location):
+        print 'Creating download directory: %s' % args.location
+        os.makedirs(args.location)
+    zipdest = download_build(args, save_to=args.location, unzip=False)
+    print 'Your build is available at %s' % zipdest
+
+
+def download_build(args, save_to=None, unzip=True):
     print 'Downloading %s' % args.flash_url
 
     user = args.flash_user
@@ -240,10 +248,13 @@ def download_build(args):
             if raw_input('OK? y/n ').strip().startswith('y'):
                 done = True
 
-    dest = os.path.join(args.work_dir, 'last-build')
-    if os.path.exists(dest):
-        shutil.rmtree(dest)
-    os.mkdir(dest)
+    if save_to is None:
+        dest = os.path.join(args.work_dir, 'last-build')
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        os.mkdir(dest)
+    else:
+        dest = save_to
     with pushd(dest):
         print 'In %s' % dest
         res = requests.get(args.flash_url,
@@ -273,7 +284,9 @@ def download_build(args):
         res.close()
         zipdest.close()
 
-        sh('unzip %s' % zipdest.name)
+        if unzip:
+            sh('unzip %s' % zipdest.name)
+        return os.path.abspath(zipdest.name)
 
 
 def get_b2g_distro(args):
@@ -471,6 +484,17 @@ def main():
     cmd.add_argument('--adb_port', default=2828, type=int,
                      help='adb port to forward on the device. '
                           'Marionette will then connect to this port.')
+    u = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
+         '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip')
+    cmd.add_argument('--flash_url', default=u,
+                     help='URL of B2G build to download. '
+                          'This requires a username/password.')
+    cmd.add_argument('--flash_user',
+                     help='Username for build URL. It will prompt '
+                          'when empty')
+    cmd.add_argument('--flash_pass',
+                     help='Password for build URL. It will prompt when '
+                          'empty')
 
     sub = cmd.add_subparsers(help='sub-command help')
 
@@ -491,17 +515,6 @@ def main():
         return sub.add_parser(action, help=help, description=help, **kw)
 
     flash = sub_parser('flash', help='Download a build and flash it')
-    u = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
-         '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip')
-    flash.add_argument('--flash_url', default=u,
-                       help='URL of B2G build to flash. '
-                            'This requires a username/password.')
-    flash.add_argument('--flash_user',
-                       help='Username for build URL. It will prompt '
-                            'when empty')
-    flash.add_argument('--flash_pass',
-                       help='Password for build URL. It will prompt when '
-                            'empty')
     flash.set_defaults(func=flash_device)
 
     reflash = sub_parser('reflash', help='Re-flash the last build you '
@@ -523,6 +536,11 @@ def main():
                             '/data/local/user.js. Exising user.js is '
                             'not preserved.')
     setup.set_defaults(func=set_up_device)
+
+    dl = sub_parser('dl', help='Download a build to a custom location')
+    dl.add_argument('--location', help='Directory to download to',
+                    default=os.path.expanduser('~/Downloads'))
+    dl.set_defaults(func=download_and_save_build)
 
     http = sub_parser('http',
                       help='Restart the device with HTTP logging '
