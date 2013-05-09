@@ -211,8 +211,11 @@ SHELL
         print 'Get output with adb logcat'
         p.wait()
     except KeyboardInterrupt:
-        p.kill()
-        p.wait()
+        try:
+            p.kill()
+            p.wait()
+        except Exception, exc:
+            print ' ** ignoring error: %s: %s' % (exc.__class__.__name__, exc)
 
     os.chdir(args.work_dir)
     sh('adb pull %s' % device_log)
