@@ -131,7 +131,11 @@ def get_marionette(args):
 def set_up_device(args):
     mc = get_marionette(args)
     device = GaiaDevice(mc)
-    device.restart_b2g()
+    try:
+        device.restart_b2g()
+    except Exception:
+        print ' ** Check to make sure you don\'t have desktop B2G running'
+        raise
 
     apps = GaiaApps(mc)
     data_layer = GaiaData(mc)
