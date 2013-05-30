@@ -39,6 +39,15 @@ from requests.auth import HTTPBasicAuth
 CHUNK_SIZE = 1024 * 13
 
 
+def user_agrees(prompt='OK? Y/N [%s]: ', default='Y',
+                strip_value=True, lower_value=True):
+    val = raw_input(prompt % default)
+    val = val.strip() if strip_value else val
+    val = val.lower() if lower_value else val
+    default = default.lower() if lower_value else default
+    if val == default or val == '':
+        return True
+
 def sh(cmd):
     return check_call(cmd, shell=True)
 
@@ -252,7 +261,7 @@ def download_build(args, save_to=None, unzip=True):
         while not done:
             user = raw_input('LDAP username: ')
             password = getpass('password: ')
-            if raw_input('OK? y/n ').strip().startswith('y'):
+            if user_agrees():
                 done = True
 
     if save_to is None:
@@ -414,7 +423,7 @@ def do_login(args):
     while not done:
         username = raw_input('Persona username: ')
         password = getpass('password: ')
-        if raw_input('OK? y/n ').strip().startswith('y'):
+        if user_agrees():
             done = True
 
     email_field = mc.find_element(*_email_input_locator)
