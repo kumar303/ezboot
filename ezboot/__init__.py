@@ -582,6 +582,17 @@ def main():
 
     args = cmd.parse_args(remaining_argv)
 
+    # check if the user actually intends to flash a Unagi device
+    if args.flash_url == u:
+        unagi = raw_input('ezboot uses Unagi\'s latest build to flash your '
+                          'device by default. If that is not what you want, '
+                          'you should use the --flash-url argument. \nDo you '
+                          'want to continue and use Unagi\'s latest build? '
+                          '(y/N)').upper()
+        if unagi == 'N' or unagi == '':
+            print '\nTry ezboot flash --flash_url <build url> argument. \nExiting.'
+            sys.exit(1)
+
     if config:
         print 'Using config: %s' % args.config
     if not find_executable('adb'):
