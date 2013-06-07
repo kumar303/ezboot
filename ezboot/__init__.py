@@ -239,6 +239,25 @@ SHELL
 
 
 def flash_device(args):
+    default_url_unagi = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
+                         '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip')
+
+    if args.flash_device is None and args.flash_url is None:
+        args.error('Try ezboot with flash with --flash_url or --flash_device '
+                   'options. Or try ezboot flash --help for more details.')
+    else:
+        if args.flash_url:
+            pass
+        else:
+            if args.flash_device.lower() == 'unagi':
+                args.flash_url = default_url_unagi
+            else:
+                prompt_msg = ('We don\'t have a URL to fetch latest build for '
+                              'build for device "%s". Please provide a URL to '
+                              'get a build for flashing your device: ' % args.flash_device)
+                # ask for a URL because we don't have it
+                args.flash_url = raw_input(prompt_msg)
+
     download_build(args)
     flash_last_dl(args)
 
@@ -500,17 +519,19 @@ def main():
     cmd.add_argument('--adb_port', default=2828, type=int,
                      help='adb port to forward on the device. '
                           'Marionette will then connect to this port.')
-    u = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
-         '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip')
-    cmd.add_argument('--flash_url', default=u,
+    cmd.add_argument('--flash_url', default=None,
                      help='URL of B2G build to download. '
-                          'This requires a username/password.')
+                          'This requires a username/password. '
+                          'This overrides the URL to use if --flash_device is '
+                          'also provided.')
     cmd.add_argument('--flash_user',
                      help='Username for build URL. It will prompt '
                           'when empty')
     cmd.add_argument('--flash_pass',
                      help='Password for build URL. It will prompt when '
                           'empty')
+    cmd.add_argument('--flash_device', default=None,
+                     help='The device you want to flash. Example: unagi')
 
     sub = cmd.add_subparsers(help='sub-command help')
 
