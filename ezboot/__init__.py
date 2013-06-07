@@ -239,8 +239,12 @@ SHELL
 
 
 def flash_device(args):
-    default_url_unagi = ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
-                         '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip')
+    default_build_urls = {
+        'unagi': ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
+                  '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip'),
+        'inari': ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
+                  '/mozilla-b2g18_v1_0_1-inari/latest/inari.zip'),
+    }
 
     if args.flash_device is None and args.flash_url is None:
         args.error('Try ezboot with flash with --flash_url or --flash_device '
@@ -249,8 +253,8 @@ def flash_device(args):
         if args.flash_url:
             pass
         else:
-            if args.flash_device.lower() == 'unagi':
-                args.flash_url = default_url_unagi
+            if args.flash_device.lower() in default_build_urls.keys():
+                args.flash_url = default_build_urls[args.flash_device.lower()]
             else:
                 prompt_msg = ('We don\'t have a URL to fetch latest build for '
                               'build for device "%s". Please provide a URL to '
