@@ -148,7 +148,30 @@ Here is a full reference::
 
     ezboot flash --help
 
-The defaults will probably work for you. If you don't want
+You will have to specify which device you want to flash since every device has
+a separate build that must be used to flash it. You can do that like so::
+
+    ezboot flash --flash_device unagi
+
+or, if you have the URL of your build, then do it like so::
+
+    ezboot flash --flash_url http://pvtbuilds.mozilla.org/...
+
+You can also set these in your ``ezboot.ini`` config file::
+
+    [flash]
+    flash_device = unagi/inari
+
+or
+
+    [flash]
+    flash_url = http://pvtbuilds.mozilla.org/...
+
+Note, that if you set both ``flash_url`` and ``flash_device``, the value
+provided for ``flash_url`` will override the default URL for the device
+value you have provided. Please refer to the full reference.
+
+Rest of the defaults will probably work for you. If you don't want
 to be prompted for your username/password each time, you can save
 them in an ``ezboot.ini`` config file::
 
