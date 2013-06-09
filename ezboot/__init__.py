@@ -30,7 +30,7 @@ import traceback
 import xml.etree.ElementTree as ET
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
-from marionette import Marionette, MarionetteTouchMixin
+from marionette import Marionette
 from marionette.errors import NoSuchElementException
 from marionette.errors import TimeoutException
 import requests
@@ -119,12 +119,8 @@ def get_installed(apps):
     return res
 
 
-class MarionetteWithTouch(Marionette, MarionetteTouchMixin):
-    pass
-
-
 def get_marionette(args):
-    mc = MarionetteWithTouch('localhost', args.adb_port)
+    mc = Marionette('localhost', args.adb_port)
     for i in range(3):
         try:
             mc.start_session()
@@ -149,7 +145,6 @@ def set_up_device(args):
     apps = GaiaApps(mc)
     data_layer = GaiaData(mc)
     lockscreen = LockScreen(mc)
-    mc.setup_touch()
 
     lockscreen.unlock()
     apps.kill_all()
@@ -184,8 +179,7 @@ def set_up_device(args):
                 print 'Installing %s from %s' % (app_name, manifest)
                 mc.execute_script('navigator.mozApps.install("%s");' % manifest)
                 wait_for_element_displayed(mc, 'id', 'app-install-install-button')
-                yes = mc.find_element('id', 'app-install-install-button')
-                mc.tap(yes)
+                yes = mc.find_element('id', 'app-install-install-button').tap()
                 # This still works but the id check broke.
                 # See https://bugzilla.mozilla.org/show_bug.cgi?id=853878
                 wait_for_element_displayed(mc, 'id', 'system-banner')
@@ -344,7 +338,6 @@ def flash_last_dl(args):
 
 def kill_all_apps(args):
     mc = get_marionette(args)
-    mc.setup_touch()
     apps = GaiaApps(mc)
     apps.kill_all()
     print 'Killed all apps'
@@ -406,7 +399,6 @@ def do_login(args):
     device = GaiaDevice(mc)
     apps = GaiaApps(mc)
     data_layer = GaiaData(mc)
-    mc.setup_touch()
 
     _persona_frame_locator = ('css selector', "iframe")
 
@@ -463,14 +455,14 @@ def do_login(args):
         v_password = mc.find_element(*_verify_new_password)
         v_password.send_keys(password)
         wait_for_element_displayed(mc, *_verify_start_button)
-        mc.tap(mc.find_element(*_verify_start_button)) #.click()
+        mc.find_element(*_verify_start_button).tap()
     except TimeoutException:
         print 'Not a new account? Trying to log in to existing account'
         # Logging into an exisiting account:
         password_field = mc.find_element(*_password_input_locator)
         password_field.send_keys(password)
         wait_for_element_displayed(mc, *_returning_button_locator)
-        mc.tap(mc.find_element(*_returning_button_locator)) #.click()
+        mc.find_element(*_returning_button_locator).tap() #.click()
 
     print 'You should be logged in now'
 
