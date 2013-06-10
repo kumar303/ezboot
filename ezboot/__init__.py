@@ -30,8 +30,10 @@ import traceback
 import xml.etree.ElementTree as ET
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
+from gaiatest.apps.browser.app import Browser
+from gaiatest.apps.marketplace.app import Marketplace
 from marionette import Marionette
-from marionette.errors import NoSuchElementException
+from marionette.errors import NoSuchElementException, StaleElementException
 from marionette.errors import TimeoutException
 import requests
 from requests.auth import HTTPBasicAuth
@@ -62,6 +64,23 @@ def wait_for_element_displayed(mc, by, locator, timeout=10):
                 break
         except NoSuchElementException:
             pass
+    else:
+        raise TimeoutException(
+            'Element %s not visible before timeout' % locator)
+
+
+def wait_for_element_not_displayed(mc, by, locator, timeout=10):
+    timeout = float(timeout) + time.time()
+
+    while time.time() < timeout:
+        time.sleep(0.5)
+        try:
+            if not mc.find_element(by, locator).is_displayed():
+                break
+        except StaleElementException:
+            pass
+        except NoSuchElementException:
+            break
     else:
         raise TimeoutException(
             'Element %s not visible before timeout' % locator)
@@ -467,6 +486,109 @@ def do_login(args):
     print 'You should be logged in now'
 
 
+def setup_dev_certs(args):
+    if args.certs_path is None:
+        args.error('You need to provide path to the directory that has dev '
+                   'certs using --certs_path.')
+
+    path = '/tmp/marketplace_dev_%s' % int(time.time())
+    sh('git clone https://github.com/briansmith/marketplace-certs.git %s' % path)
+    sh('%s/change_trusted_servers.sh full_unagi "https://marketplace-dev.allizom.org,https://marketplace.firefox.com"' % path)
+
+    certs_path = args.certs_path
+    if not os.path.isabs(certs_path):
+        certs_path = os.path.join(os.getcwd(), certs_path)
+    sh('%s/push_certdb.sh full_unagi %s' % (path, certs_path))
+    sh('adb reboot')
+
+    print('Cleaning up...')
+    shutil.rmtree(path)
+
+
+def install_marketplace_dev(args):
+    args.manifest = 'https://marketplace-dev.allizom.org/manifest.webapp'
+    args.app = None
+    install_app(args)
+
+
+def install_app(args):
+    def confirm_installation():
+        _yes_button_locator = ('id', 'app-install-install-button')
+
+        wait_for_element_displayed(mc, *_yes_button_locator)
+        mc.find_element(*_yes_button_locator).tap()
+        wait_for_element_not_displayed(mc, *_yes_button_locator)
+
+        print 'App successfully installed.'
+
+    if not args.app and not args.manifest:
+        args.error('Provide either app name (using --app) or URL of app\'s manigest file (using --manifest).')
+
+    mc = get_marionette(args)
+    lockscreen = LockScreen(mc)
+    mc.setup_touch()
+    lockscreen.unlock()
+
+    apps = GaiaApps(mc)
+    apps.kill_all()
+
+    no_internet_error = ('Unable to download app.\nReason: You are probably '
+                         'not connected to internet on your device.')
+
+    if args.manifest:
+        mc.execute_script('navigator.mozApps.install("%s")' % args.manifest)
+        try:
+            confirm_installation()
+        except TimeoutException:
+            args.error(no_internet_error)
+        return
+
+    if args.prod:
+        marketplace_app = 'Marketplace'
+        marketplace_url = 'https://marketplace.firefox.com/'
+    else:
+        marketplace_app = 'Marketplace Dev'
+        marketplace_url = 'https://marketplace-dev.allizom.org/'
+
+    # apps.kill_all()
+    if args.browser:
+        browser = Browser(mc)
+        browser.launch()
+        browser.go_to_url(marketplace_url)
+
+        browser.switch_to_content()
+        browser.wait_for_element_not_displayed(*('css selector', 'div#splash-overlay'))
+
+    marketplace = Marketplace(mc, marketplace_app)
+
+    if not args.browser:
+        try:
+            marketplace.launch()
+        except AssertionError:
+            e = ('Marketplace Dev app is not installed. Install it using '
+                 '--install_marketplace_dev or use --browser to install apps '
+                 'from the browser directly.')
+            args.error(e)
+
+        if args.prod:
+            marketplace.switch_to_marketplace_frame()
+
+    marketplace.wait_for_element_not_displayed(*('css selector', 'div#splash-overlay'))
+
+    try:
+        results = marketplace.search(args.app)
+    except NoSuchElementException:
+        args.error(no_internet_error)
+
+    try:
+        import pdb; pdb.set_trace()
+        results.search_results[0].tap_install_button()
+    except IndexError:
+        args.error('Error: App not found.')
+
+    confirm_installation()
+
+
 @contextmanager
 def pushd(newdir):
     wd = os.getcwd()
@@ -569,6 +691,23 @@ def main():
                             '/data/local/user.js. Exising user.js is '
                             'not preserved.')
     setup.set_defaults(func=set_up_device)
+
+    install_devcerts = sub_parser('install_devcerts', help='Setup dev certs for testing.')
+    install_devcerts.add_argument('--certs_path', help='Path to the directory that has dev certs.',
+                                   default=None)
+    install_devcerts.set_defaults(func=setup_dev_certs)
+
+    install_mp = sub_parser('install_marketplace_dev')
+    install_mp.set_defaults(func=install_app)
+
+    install = sub_parser('install')
+    install.add_argument('--app', help='Name of the app you want to install from the marketplace.')
+    install.add_argument('--browser', help='If you want to use marketplace in the browser.',
+                         action='store_true')
+    install.add_argument('--prod', help='Install from Marketplace (production) instead of Marketplace Dev.',
+                         action='store_true')
+    install.add_argument('--manifest', help='Path to manifest file.')
+    install.set_defaults(func=install_app)
 
     dl = sub_parser('dl', help='Download a build to a custom location')
     dl.add_argument('--location', help='Directory to download to',
