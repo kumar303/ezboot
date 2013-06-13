@@ -503,29 +503,52 @@ def setup_certs(args):
                                   'now.')
 
     def setup_dev():
-        path = '/tmp/marketplace_dev_%s' % int(time.time())
-        sh('git clone https://github.com/briansmith/marketplace-certs.git %s' % path)
-        sh('%s/change_trusted_servers.sh full_unagi "https://marketplace-dev.allizom.org,https://marketplace.firefox.com"' % path)
+        certs_path = os.path.abspath(args.certs_path)
 
-        certs_path = args.certs_path
-        if not os.path.isabs(certs_path):
-            certs_path = os.path.join(os.getcwd(), certs_path)
-        sh('%s/push_certdb.sh full_unagi %s' % (path, certs_path))
-        sh('adb reboot')
+        with pushd(args.work_dir):
+            path = 'marketplace-certs'
 
-        print('Cleaning up...')
-        shutil.rmtree(path)
+            if not os.path.exists('marketplace-certs'):
+                print 'Cloning certificates for the first itme.'
+                sh('git clone https://github.com/briansmith/marketplace-certs.git')
+            else:
+                # pull the latest changes from remote
+                print 'Updating certificates from remote.'
+                with pushd(path):
+                    sh('git pull')
+
+            sh('%s/change_trusted_servers.sh full_unagi "https://marketplace-dev.allizom.org,https://marketplace.firefox.com"' % path)
+            sh('%s/push_certdb.sh full_unagi %s' % (path, certs_path))
+            sh('adb reboot')
+
+    if args.env is None:
+        args.error('Provide which version of dev certs you want to install. '
+                   'For example, --dev.')
 
     for env in args.env:
-        # add your optional environment in this if block
-        if env == 'dev':
-            setup_dev()
+        func = locals().get('setup_%s' % env, None)
+        if func is not None:
+            print 'Installing marketplace %s certs...' % env
+            func()
 
 
-def install_marketplace_dev(args):
-    args.manifest = 'https://marketplace-dev.allizom.org/manifest.webapp'
-    args.app = None
-    install_app(args)
+def install_marketplace(args):
+    # install marketplace dev
+    def install_dev():
+        args.manifest = 'https://marketplace-dev.allizom.org/manifest.webapp'
+        args.app = None
+
+        install_app(args)
+
+    if args.env is None:
+        args.error('Provide which version of marketplace you want to install. '
+                   'For example, --dev.')
+
+    for env in args.env:
+        func = locals().get('install_%s' % env, None)
+        if func is not None:
+            print 'Installing Marketplace %s' % env
+            func()
 
 
 def install_app(args):
@@ -543,7 +566,7 @@ def install_app(args):
 
     if not args.app and not args.manifest:
         args.error('Provide either app name (using --app) or URL of app\'s '
-                   'manigest file (using --manifest).')
+                   'manifest file (using --manifest).')
 
     mc = get_marionette(args)
     lockscreen = LockScreen(mc)
@@ -559,7 +582,8 @@ def install_app(args):
         mc.execute_script('navigator.mozApps.install("%s")' % args.manifest)
         try:
             confirm_installation()
-        except TimeoutException:
+        except TimeoutException, exc:
+            print '** %s: %s' % (exc.__class__.__name__, exc)
             args.error(no_internet_error)
         return
 
@@ -597,7 +621,8 @@ def install_app(args):
 
     try:
         results = marketplace.search(args.app)
-    except NoSuchElementException:
+    except NoSuchElementException, exc:
+        print '** %s: %s' % (exc.__class__.__name__, exc)
         args.error(no_internet_error)
 
     try:
@@ -715,16 +740,15 @@ def main():
     mkt_certs.add_argument('--certs_path',
                            help='Path to the directory that has dev certs.',
                            required=True)
-    mkt_certs.add_argument('--flash_device',
-                           help='The device you want to install certs on.',
-                           required=True)
     # we can add more options like this whenever we want
     mkt_certs.add_argument('--dev', help='Install certs for marketplace dev.',
                            dest='env', action='append_const', const='dev')
     mkt_certs.set_defaults(func=setup_certs)
 
-    install_mp = sub_parser('install_marketplace_dev')
-    install_mp.set_defaults(func=install_marketplace_dev)
+    install_mp = sub_parser('install_mkt')
+    install_mp.add_argument('--dev', help='Install marketplace dev.',
+                            dest='env', action='append_const', const='dev')
+    install_mp.set_defaults(func=install_marketplace)
 
     install = sub_parser('install', help='Install an app on device using '
                                          'manifest file or marketplace.')
