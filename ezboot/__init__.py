@@ -198,10 +198,20 @@ def set_up_device(args):
                 print 'Installing %s from %s' % (app_name, manifest)
                 mc.execute_script('navigator.mozApps.install("%s");' % manifest)
                 wait_for_element_displayed(mc, 'id', 'app-install-install-button')
-                yes = mc.find_element('id', 'app-install-install-button').tap()
-                # This still works but the id check broke.
-                # See https://bugzilla.mozilla.org/show_bug.cgi?id=853878
-                wait_for_element_displayed(mc, 'id', 'system-banner')
+                mc.find_element('id', 'app-install-install-button').tap()
+                wait_for_element_not_displayed(mc, 'id', 'app-install-install-button')
+
+                # confirm that app got installed
+                homescreen_frame = mc.find_element(*('css selector',
+                                                   'div.homescreen iframe'))
+                mc.switch_to_frame(homescreen_frame)
+                _app_icon_locator = ('xpath', "//li[@class='icon']//span[text()='%s']" % app_name)
+                try:
+                    mc.find_element(*_app_icon_locator)
+                except NoSuchElementException:
+                    print 'Error: app could not be installed.'
+                    sys.exit(1)
+
         except Exception, exc:
             print ' ** installing manifest %s failed (maybe?)' % manifest
             print ' ** error: %s: %s' % (exc.__class__.__name__, exc)
@@ -486,23 +496,30 @@ def do_login(args):
     print 'You should be logged in now'
 
 
-def setup_dev_certs(args):
-    if args.certs_path is None:
-        args.error('You need to provide path to the directory that has dev '
-                   'certs using --certs_path.')
+def setup_certs(args):
+    # TODO get rid of this and work out a solution for inari as well.
+    if args.flash_device.lower() != 'unagi':
+        raise NotImplementedError('Certs can only be installed on unagi right '
+                                  'now.')
 
-    path = '/tmp/marketplace_dev_%s' % int(time.time())
-    sh('git clone https://github.com/briansmith/marketplace-certs.git %s' % path)
-    sh('%s/change_trusted_servers.sh full_unagi "https://marketplace-dev.allizom.org,https://marketplace.firefox.com"' % path)
+    def setup_dev():
+        path = '/tmp/marketplace_dev_%s' % int(time.time())
+        sh('git clone https://github.com/briansmith/marketplace-certs.git %s' % path)
+        sh('%s/change_trusted_servers.sh full_unagi "https://marketplace-dev.allizom.org,https://marketplace.firefox.com"' % path)
 
-    certs_path = args.certs_path
-    if not os.path.isabs(certs_path):
-        certs_path = os.path.join(os.getcwd(), certs_path)
-    sh('%s/push_certdb.sh full_unagi %s' % (path, certs_path))
-    sh('adb reboot')
+        certs_path = args.certs_path
+        if not os.path.isabs(certs_path):
+            certs_path = os.path.join(os.getcwd(), certs_path)
+        sh('%s/push_certdb.sh full_unagi %s' % (path, certs_path))
+        sh('adb reboot')
 
-    print('Cleaning up...')
-    shutil.rmtree(path)
+        print('Cleaning up...')
+        shutil.rmtree(path)
+
+    for env in args.env:
+        # add your optional environment in this if block
+        if env == 'dev':
+            setup_dev()
 
 
 def install_marketplace_dev(args):
@@ -521,12 +538,15 @@ def install_app(args):
 
         print 'App successfully installed.'
 
+    # marketplace loading fragment locator
+    _loading_fragment_locator = ('css selector', 'div#splash-overlay')
+
     if not args.app and not args.manifest:
-        args.error('Provide either app name (using --app) or URL of app\'s manigest file (using --manifest).')
+        args.error('Provide either app name (using --app) or URL of app\'s '
+                   'manigest file (using --manifest).')
 
     mc = get_marionette(args)
     lockscreen = LockScreen(mc)
-    mc.setup_touch()
     lockscreen.unlock()
 
     apps = GaiaApps(mc)
@@ -557,7 +577,7 @@ def install_app(args):
         browser.go_to_url(marketplace_url)
 
         browser.switch_to_content()
-        browser.wait_for_element_not_displayed(*('css selector', 'div#splash-overlay'))
+        browser.wait_for_element_not_displayed(*_loading_fragment_locator)
 
     marketplace = Marketplace(mc, marketplace_app)
 
@@ -573,7 +593,7 @@ def install_app(args):
         if args.prod:
             marketplace.switch_to_marketplace_frame()
 
-    marketplace.wait_for_element_not_displayed(*('css selector', 'div#splash-overlay'))
+    marketplace.wait_for_element_not_displayed(*_loading_fragment_locator)
 
     try:
         results = marketplace.search(args.app)
@@ -581,7 +601,6 @@ def install_app(args):
         args.error(no_internet_error)
 
     try:
-        import pdb; pdb.set_trace()
         results.search_results[0].tap_install_button()
     except IndexError:
         args.error('Error: App not found.')
@@ -692,19 +711,30 @@ def main():
                             'not preserved.')
     setup.set_defaults(func=set_up_device)
 
-    install_devcerts = sub_parser('install_devcerts', help='Setup dev certs for testing.')
-    install_devcerts.add_argument('--certs_path', help='Path to the directory that has dev certs.',
-                                   default=None)
-    install_devcerts.set_defaults(func=setup_dev_certs)
+    mkt_certs = sub_parser('mkt_certs', help='Setup dev certs for testing.')
+    mkt_certs.add_argument('--certs_path',
+                           help='Path to the directory that has dev certs.',
+                           required=True)
+    mkt_certs.add_argument('--flash_device',
+                           help='The device you want to install certs on.',
+                           required=True)
+    # we can add more options like this whenever we want
+    mkt_certs.add_argument('--dev', help='Install certs for marketplace dev.',
+                           dest='env', action='append_const', const='dev')
+    mkt_certs.set_defaults(func=setup_certs)
 
     install_mp = sub_parser('install_marketplace_dev')
-    install_mp.set_defaults(func=install_app)
+    install_mp.set_defaults(func=install_marketplace_dev)
 
-    install = sub_parser('install')
-    install.add_argument('--app', help='Name of the app you want to install from the marketplace.')
-    install.add_argument('--browser', help='If you want to use marketplace in the browser.',
+    install = sub_parser('install', help='Install an app on device using '
+                                         'manifest file or marketplace.')
+    install.add_argument('--app', help='Name of the app you want to install '
+                                       'from the marketplace.')
+    install.add_argument('--browser', help='If you want to use marketplace in'
+                                           ' the browser.',
                          action='store_true')
-    install.add_argument('--prod', help='Install from Marketplace (production) instead of Marketplace Dev.',
+    install.add_argument('--prod', help='Install from Marketplace (production)'
+                                        ' instead of Marketplace Dev.',
                          action='store_true')
     install.add_argument('--manifest', help='Path to manifest file.')
     install.set_defaults(func=install_app)
