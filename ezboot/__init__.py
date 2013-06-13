@@ -209,8 +209,7 @@ def set_up_device(args):
                 try:
                     mc.find_element(*_app_icon_locator)
                 except NoSuchElementException:
-                    print 'Error: app could not be installed.'
-                    sys.exit(1)
+                    args.error('Error: app could not be installed.')
 
         except Exception, exc:
             print ' ** installing manifest %s failed (maybe?)' % manifest
@@ -508,17 +507,22 @@ def setup_certs(args):
         with pushd(args.work_dir):
             path = 'marketplace-certs'
 
-            if not os.path.exists('marketplace-certs'):
+            if not os.path.exists(path):
                 print 'Cloning certificates for the first itme.'
-                sh('git clone https://github.com/briansmith/marketplace-certs.git')
+                sh('git clone https://github.com/briansmith/'
+                   'marketplace-certs.git %s'
+                   % os.path.join(args.work_dir, path))
             else:
                 # pull the latest changes from remote
                 print 'Updating certificates from remote.'
                 with pushd(path):
                     sh('git pull')
 
-            sh('%s/change_trusted_servers.sh full_unagi "https://marketplace-dev.allizom.org,https://marketplace.firefox.com"' % path)
-            sh('%s/push_certdb.sh full_unagi %s' % (path, certs_path))
+            with pushd(path):
+                sh('./change_trusted_servers.sh full_unagi '
+                   '"https://marketplace-dev.allizom.org,'
+                   'https://marketplace.firefox.com"')
+                sh('./push_certdb.sh full_unagi %s' % certs_path)
             sh('adb reboot')
 
     if args.env is None:
@@ -610,7 +614,7 @@ def install_app(args):
             marketplace.launch()
         except AssertionError:
             e = ('Marketplace Dev app is not installed. Install it using '
-                 '--install_marketplace_dev or use --browser to install apps '
+                 '--install_mkt or use --browser to install apps '
                  'from the browser directly.')
             args.error(e)
 
