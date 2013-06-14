@@ -118,6 +118,14 @@ Run this for a quick reference::
 
     ezboot --help
 
+Using Ezboot To Work With Marketplace Payments
+----------------------------------------------
+
+To whet your appetite, here is a full example of ezboot's intended use.
+This `documentation <https://webpay.readthedocs.org/en/latest/use_hosted_webpay.html#set-up-a-device-with-ezboot>`_
+shows you how to make a local config file and use ezboot to quickly prepare a B2G
+device for hacking on the Firefox Marketplace payments system.
+
 Config file
 -----------
 
@@ -137,8 +145,27 @@ For example::
     flash_user = ...
     flash_pass = ...
 
+Using a config file greatly simplifies ezboot because you won't have to set
+commonly used option values.
+
 Commands
 ========
+
+dl
+--
+
+This downloads a build and saves the Zip file to a custom directory.
+The build will not be flashed to a
+device and any subsequent ``reflash`` command will not attempt to use
+it. This is just a convenient way to grab a build without logging in;
+the same user/pass options from ``flash`` apply here.
+
+Here is a full reference::
+
+    ezboot dl --help
+
+You can set a custom location with ``ezboot dl --location=...``.
+By default it will save builds to ``~/Downloads``.
 
 flash
 -----
@@ -181,6 +208,107 @@ them in an ``ezboot.ini`` config file::
 
 Captain Obvious says don't commit your password to a public repo.
 
+http
+----
+
+This restarts your phone with HTTP logging *temporarily* enabled.
+Here is the full reference::
+
+    ezboot http --help
+
+This runs B2G on the device until you interrupt it (^C). After you're
+finished the console will tell you where to find a log of all HTTP
+requests/responses. When you view the file it might warn you that it
+has binary content but that's typically just at the beginning of the file.
+Keep paging.
+
+install
+-------
+
+Install an app from the Firefox Marketplace.
+
+::
+
+    ezboot install --help
+
+This is an alternative to specifying manifest URLs in ``setup`` and will let
+you install an app by name. Example::
+
+    ezboot install --app 'Sliding Puzzle' --browser
+
+install_mkt
+-----------
+
+Install a pre-production version of the `packaged Marketplace`_ app.
+This requires you to run ``mkt_certs`` first.
+
+::
+
+    ezboot install_mkt --help
+
+Example::
+
+    ezboot install_mkt --dev
+
+Because some bootstrapping is necessary this will install the app from your
+B2G browser.
+
+.. _`packaged Marketplace`: https://github.com/mozilla/fireplace
+
+kill
+----
+
+This kills all running apps which may be useful when you need to reload
+styles, js or other assets.
+
+::
+
+    ezboot kill --help
+
+The ``recss`` command might be faster.
+
+login
+-----
+
+Make sure a `Persona`_ screen is open on the device then type
+``ezboot login``. Here is a reference::
+
+    ezboot login --help
+
+This lets you type the username / password to a new Persona account from
+your nice desktop keyboard instead of the device keypad. In a real world
+situation this wouldn't be as annoying since Persona remembers who you are
+but for development you'll be typing new accounts all the time for testing.
+
+.. _Persona: https://login.persona.org/
+
+mkt_certs
+---------
+
+This pushes the cert files to your device so that you can install the
+Marketplace packaged app (dev version) with elevated privileges and install
+signed apps from that Marketplace. You obviously don't need this if you simply
+want to use the production version of Marketplace that is pre-installed on
+device.
+
+::
+
+    ezboot mkt_certs --help
+
+Ask someone for a cert file
+(see `this issue <https://github.com/briansmith/marketplace-certs/issues/1>`_),
+download it, and unzip it.
+You can install certs for the Marketplace dev packaged app like this::
+
+   ezboot mkt_certs --dev --certs_path ~/Downloads/certdb.tmp/
+
+recss
+-----
+
+This reloads all stylesheets on the current frame. More info::
+
+    ezboot recss --help
+
 setup
 -----
 
@@ -208,70 +336,6 @@ By convention, if you put a custom prefs file in ``./ezboot/custom-prefs.js``
 where dot is the working directory then it will be pushed to
 ``/data/local/user.js`` on the device. Any existing custom prefs are not
 preserved.
-
-dl
---
-
-This downloads a build and saves the Zip file to a custom directory.
-The build will not be flashed to a
-device and any subsequent ``reflash`` command will not attempt to use
-it. This is just a convenient way to grab a build without logging in;
-the same user/pass options from ``flash`` apply here.
-
-Here is a full reference::
-
-    ezboot dl --help
-
-You can set a custom location with ``ezboot dl --location=...``.
-By default it will save builds to ``~/Downloads``.
-
-http
-----
-
-This restarts your phone with HTTP logging *temporarily* enabled.
-Here is the full reference::
-
-    ezboot http --help
-
-This runs B2G on the device until you interrupt it (^C). After you're
-finished the console will tell you where to find a log of all HTTP
-requests/responses. When you view the file it might warn you that it
-has binary content but that's typically just at the beginning of the file.
-Keep paging.
-
-login
------
-
-Make sure a `Persona`_ screen is open on the device then type
-``ezboot login``. Here is a reference::
-
-    ezboot login --help
-
-This lets you type the username / password to a new Persona account from
-your nice desktop keyboard instead of the device keypad. In a real world
-situation this wouldn't be as annoying since Persona remembers who you are
-but for development you'll be typing new accounts all the time for testing.
-
-.. _Persona: https://login.persona.org/
-
-kill
-----
-
-This kills all running apps which may be useful when you need to reload
-styles, js or other assets.
-
-::
-
-    ezboot kill --help
-
-The ``recss`` command might be faster.
-
-recss
------
-
-This reloads all stylesheets on the current frame. More info::
-
-    ezboot recss --help
 
 Why?
 ====
