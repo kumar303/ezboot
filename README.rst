@@ -302,6 +302,18 @@ You can install certs for the Marketplace dev packaged app like this::
 
    ezboot mkt_certs --dev --certs_path ~/Downloads/certdb.tmp/
 
+reflash
+-------
+
+This flashes the last downloaded build without downloading a new one.
+This is an easy way to clear cookies and other saved artifacts on device.
+
+::
+
+    ezboot reflash --help
+
+See the ``flash`` command for more info.
+
 recss
 -----
 
