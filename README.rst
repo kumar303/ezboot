@@ -20,11 +20,11 @@ Features:
 * You can use a config file for everything
 * Frictionless convention over configuration
 
-Do you really need this? Probably not! You should try the
-`Firefox OS Simulator`_ first. There are some device
-interaction features coming very soon to the simulator
-(such as Push To Device)
-that will hopefully make this script obsolete.
+Do you really need this? Probably not!
+``ezboot`` is intended for B2G platform developers.
+If you are a B2G **app** developer you should try the
+`Firefox OS Simulator`_ first because that will have
+better features for you (such as Push To Device).
 
 Requirements:
 
