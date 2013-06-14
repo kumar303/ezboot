@@ -539,8 +539,10 @@ def setup_certs(args):
 def install_marketplace(args):
     # install marketplace dev
     def install_dev():
-        args.manifest = 'https://marketplace-dev.allizom.org/manifest.webapp'
-        args.app = None
+        args.app = 'Marketplace Dev'
+        args.browser = True
+        args.manifest = None
+        args.prod = False
 
         install_app(args)
 
@@ -614,7 +616,7 @@ def install_app(args):
             marketplace.launch()
         except AssertionError:
             e = ('Marketplace Dev app is not installed. Install it using '
-                 '--install_mkt or use --browser to install apps '
+                 'install_mkt --dev or use --browser to install apps '
                  'from the browser directly.')
             args.error(e)
 
@@ -740,16 +742,17 @@ def main():
                             'not preserved.')
     setup.set_defaults(func=set_up_device)
 
-    mkt_certs = sub_parser('mkt_certs', help='Setup dev certs for testing.')
+    mkt_certs = sub_parser('mkt_certs', help='Setup certs for packaged '
+                                             'marketplace for testing.')
     mkt_certs.add_argument('--certs_path',
                            help='Path to the directory that has dev certs.',
                            required=True)
     # we can add more options like this whenever we want
-    mkt_certs.add_argument('--dev', help='Install certs for marketplace dev.',
+    mkt_certs.add_argument('--dev', help='Setup certs for marketplace dev.',
                            dest='env', action='append_const', const='dev')
     mkt_certs.set_defaults(func=setup_certs)
 
-    install_mp = sub_parser('install_mkt')
+    install_mp = sub_parser('install_mkt', help='Install marketplace app.')
     install_mp.add_argument('--dev', help='Install marketplace dev.',
                             dest='env', action='append_const', const='dev')
     install_mp.set_defaults(func=install_marketplace)
