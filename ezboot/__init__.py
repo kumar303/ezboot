@@ -30,8 +30,10 @@ import traceback
 import xml.etree.ElementTree as ET
 
 from gaiatest import GaiaDevice, GaiaApps, GaiaData, LockScreen
-from marionette import Marionette, MarionetteTouchMixin
-from marionette.errors import NoSuchElementException
+from gaiatest.apps.browser.app import Browser
+from gaiatest.apps.marketplace.app import Marketplace
+from marionette import Marionette
+from marionette.errors import NoSuchElementException, StaleElementException
 from marionette.errors import TimeoutException
 import requests
 from requests.auth import HTTPBasicAuth
@@ -62,6 +64,23 @@ def wait_for_element_displayed(mc, by, locator, timeout=10):
                 break
         except NoSuchElementException:
             pass
+    else:
+        raise TimeoutException(
+            'Element %s not visible before timeout' % locator)
+
+
+def wait_for_element_not_displayed(mc, by, locator, timeout=10):
+    timeout = float(timeout) + time.time()
+
+    while time.time() < timeout:
+        time.sleep(0.5)
+        try:
+            if not mc.find_element(by, locator).is_displayed():
+                break
+        except StaleElementException:
+            pass
+        except NoSuchElementException:
+            break
     else:
         raise TimeoutException(
             'Element %s not visible before timeout' % locator)
@@ -119,12 +138,8 @@ def get_installed(apps):
     return res
 
 
-class MarionetteWithTouch(Marionette, MarionetteTouchMixin):
-    pass
-
-
 def get_marionette(args):
-    mc = MarionetteWithTouch('localhost', args.adb_port)
+    mc = Marionette('localhost', args.adb_port)
     for i in range(3):
         try:
             mc.start_session()
@@ -149,7 +164,6 @@ def set_up_device(args):
     apps = GaiaApps(mc)
     data_layer = GaiaData(mc)
     lockscreen = LockScreen(mc)
-    mc.setup_touch()
 
     lockscreen.unlock()
     apps.kill_all()
@@ -184,11 +198,19 @@ def set_up_device(args):
                 print 'Installing %s from %s' % (app_name, manifest)
                 mc.execute_script('navigator.mozApps.install("%s");' % manifest)
                 wait_for_element_displayed(mc, 'id', 'app-install-install-button')
-                yes = mc.find_element('id', 'app-install-install-button')
-                mc.tap(yes)
-                # This still works but the id check broke.
-                # See https://bugzilla.mozilla.org/show_bug.cgi?id=853878
-                wait_for_element_displayed(mc, 'id', 'system-banner')
+                mc.find_element('id', 'app-install-install-button').tap()
+                wait_for_element_not_displayed(mc, 'id', 'app-install-install-button')
+
+                # confirm that app got installed
+                homescreen_frame = mc.find_element(*('css selector',
+                                                   'div.homescreen iframe'))
+                mc.switch_to_frame(homescreen_frame)
+                _app_icon_locator = ('xpath', "//li[@class='icon']//span[text()='%s']" % app_name)
+                try:
+                    mc.find_element(*_app_icon_locator)
+                except NoSuchElementException:
+                    args.error('Error: app could not be installed.')
+
         except Exception, exc:
             print ' ** installing manifest %s failed (maybe?)' % manifest
             print ' ** error: %s: %s' % (exc.__class__.__name__, exc)
@@ -344,7 +366,6 @@ def flash_last_dl(args):
 
 def kill_all_apps(args):
     mc = get_marionette(args)
-    mc.setup_touch()
     apps = GaiaApps(mc)
     apps.kill_all()
     print 'Killed all apps'
@@ -406,7 +427,6 @@ def do_login(args):
     device = GaiaDevice(mc)
     apps = GaiaApps(mc)
     data_layer = GaiaData(mc)
-    mc.setup_touch()
 
     _persona_frame_locator = ('css selector', "iframe")
 
@@ -463,16 +483,160 @@ def do_login(args):
         v_password = mc.find_element(*_verify_new_password)
         v_password.send_keys(password)
         wait_for_element_displayed(mc, *_verify_start_button)
-        mc.tap(mc.find_element(*_verify_start_button)) #.click()
+        mc.find_element(*_verify_start_button).tap()
     except TimeoutException:
         print 'Not a new account? Trying to log in to existing account'
         # Logging into an exisiting account:
         password_field = mc.find_element(*_password_input_locator)
         password_field.send_keys(password)
         wait_for_element_displayed(mc, *_returning_button_locator)
-        mc.tap(mc.find_element(*_returning_button_locator)) #.click()
+        mc.find_element(*_returning_button_locator).tap() #.click()
 
     print 'You should be logged in now'
+
+
+def setup_certs(args):
+    # TODO get rid of this and work out a solution for inari as well.
+    if args.flash_device.lower() != 'unagi':
+        raise NotImplementedError('Certs can only be installed on unagi right '
+                                  'now.')
+
+    def setup_dev():
+        certs_path = os.path.abspath(args.certs_path)
+
+        with pushd(args.work_dir):
+            path = 'marketplace-certs'
+
+            if not os.path.exists(path):
+                print 'Cloning certificates for the first itme.'
+                sh('git clone https://github.com/briansmith/'
+                   'marketplace-certs.git %s'
+                   % os.path.join(args.work_dir, path))
+            else:
+                # pull the latest changes from remote
+                print 'Updating certificates from remote.'
+                with pushd(path):
+                    sh('git pull')
+
+            with pushd(path):
+                sh('./change_trusted_servers.sh full_unagi '
+                   '"https://marketplace-dev.allizom.org,'
+                   'https://marketplace.firefox.com"')
+                sh('./push_certdb.sh full_unagi %s' % certs_path)
+            sh('adb reboot')
+
+    if args.env is None:
+        args.error('Provide which version of dev certs you want to install. '
+                   'For example, --dev.')
+
+    for env in args.env:
+        func = locals().get('setup_%s' % env, None)
+        if func is not None:
+            print 'Installing marketplace %s certs...' % env
+            func()
+
+
+def install_marketplace(args):
+    # install marketplace dev
+    def install_dev():
+        args.app = 'Marketplace Dev'
+        args.browser = True
+        args.manifest = None
+        args.prod = False
+
+        install_app(args)
+
+    if args.env is None:
+        args.error('Provide which version of marketplace you want to install. '
+                   'For example, --dev.')
+
+    for env in args.env:
+        func = locals().get('install_%s' % env, None)
+        if func is not None:
+            print 'Installing Marketplace %s' % env
+            func()
+
+
+def install_app(args):
+    def confirm_installation():
+        _yes_button_locator = ('id', 'app-install-install-button')
+
+        wait_for_element_displayed(mc, *_yes_button_locator)
+        mc.find_element(*_yes_button_locator).tap()
+        wait_for_element_not_displayed(mc, *_yes_button_locator)
+
+        print 'App successfully installed.'
+
+    # marketplace loading fragment locator
+    _loading_fragment_locator = ('css selector', 'div#splash-overlay')
+
+    if not args.app and not args.manifest:
+        args.error('Provide either app name (using --app) or URL of app\'s '
+                   'manifest file (using --manifest).')
+
+    mc = get_marionette(args)
+    lockscreen = LockScreen(mc)
+    lockscreen.unlock()
+
+    apps = GaiaApps(mc)
+    apps.kill_all()
+
+    no_internet_error = ('Unable to download app.\nReason: You are probably '
+                         'not connected to internet on your device.')
+
+    if args.manifest:
+        mc.execute_script('navigator.mozApps.install("%s")' % args.manifest)
+        try:
+            confirm_installation()
+        except TimeoutException, exc:
+            print '** %s: %s' % (exc.__class__.__name__, exc)
+            args.error(no_internet_error)
+        return
+
+    if args.prod:
+        marketplace_app = 'Marketplace'
+        marketplace_url = 'https://marketplace.firefox.com/'
+    else:
+        marketplace_app = 'Marketplace Dev'
+        marketplace_url = 'https://marketplace-dev.allizom.org/'
+
+    # apps.kill_all()
+    if args.browser:
+        browser = Browser(mc)
+        browser.launch()
+        browser.go_to_url(marketplace_url)
+
+        browser.switch_to_content()
+        browser.wait_for_element_not_displayed(*_loading_fragment_locator)
+
+    marketplace = Marketplace(mc, marketplace_app)
+
+    if not args.browser:
+        try:
+            marketplace.launch()
+        except AssertionError:
+            e = ('Marketplace Dev app is not installed. Install it using '
+                 'install_mkt --dev or use --browser to install apps '
+                 'from the browser directly.')
+            args.error(e)
+
+        if args.prod:
+            marketplace.switch_to_marketplace_frame()
+
+    marketplace.wait_for_element_not_displayed(*_loading_fragment_locator)
+
+    try:
+        results = marketplace.search(args.app)
+    except NoSuchElementException, exc:
+        print '** %s: %s' % (exc.__class__.__name__, exc)
+        args.error(no_internet_error)
+
+    try:
+        results.search_results[0].tap_install_button()
+    except IndexError:
+        args.error('Error: App not found.')
+
+    confirm_installation()
 
 
 @contextmanager
@@ -577,6 +741,34 @@ def main():
                             '/data/local/user.js. Exising user.js is '
                             'not preserved.')
     setup.set_defaults(func=set_up_device)
+
+    mkt_certs = sub_parser('mkt_certs', help='Setup certs for packaged '
+                                             'marketplace for testing.')
+    mkt_certs.add_argument('--certs_path',
+                           help='Path to the directory that has dev certs.',
+                           required=True)
+    # we can add more options like this whenever we want
+    mkt_certs.add_argument('--dev', help='Setup certs for marketplace dev.',
+                           dest='env', action='append_const', const='dev')
+    mkt_certs.set_defaults(func=setup_certs)
+
+    install_mp = sub_parser('install_mkt', help='Install marketplace app.')
+    install_mp.add_argument('--dev', help='Install marketplace dev.',
+                            dest='env', action='append_const', const='dev')
+    install_mp.set_defaults(func=install_marketplace)
+
+    install = sub_parser('install', help='Install an app on device using '
+                                         'manifest file or marketplace.')
+    install.add_argument('--app', help='Name of the app you want to install '
+                                       'from the marketplace.')
+    install.add_argument('--browser', help='If you want to use marketplace in'
+                                           ' the browser.',
+                         action='store_true')
+    install.add_argument('--prod', help='Install from Marketplace (production)'
+                                        ' instead of Marketplace Dev.',
+                         action='store_true')
+    install.add_argument('--manifest', help='Path to manifest file.')
+    install.set_defaults(func=install_app)
 
     dl = sub_parser('dl', help='Download a build to a custom location')
     dl.add_argument('--location', help='Directory to download to',

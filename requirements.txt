@@ -1,2 +1,2 @@
-gaiatest == 0.10
+gaiatest == 0.11
 requests >= 1.1.0
