@@ -569,6 +569,7 @@ def install_app(args):
 
     # marketplace loading fragment locator
     _loading_fragment_locator = ('css selector', 'div#splash-overlay')
+    _search_locator = ('id', 'search-q')
 
     if not args.app and not args.manifest:
         args.error('Provide either app name (using --app) or URL of app\'s '
@@ -623,9 +624,8 @@ def install_app(args):
         if args.prod:
             marketplace.switch_to_marketplace_frame()
 
-    marketplace.wait_for_element_not_displayed(*_loading_fragment_locator)
-
     try:
+        marketplace.wait_for_element_displayed(*_search_locator)
         results = marketplace.search(args.app)
     except NoSuchElementException, exc:
         print '** %s: %s' % (exc.__class__.__name__, exc)
