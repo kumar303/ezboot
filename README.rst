@@ -189,7 +189,7 @@ You can also set these in your ``ezboot.ini`` config file::
     [flash]
     flash_device = unagi/inari
 
-or
+or::
 
     [flash]
     flash_url = http://pvtbuilds.mozilla.org/...
