@@ -153,78 +153,64 @@ def get_marionette(args):
 
 
 def set_up_device(args):
-    mc = get_marionette(args)
-    device = GaiaDevice(mc)
-    try:
-        device.restart_b2g()
-    except Exception:
-        print ' ** Check to make sure you don\'t have desktop B2G running'
-        raise
-
-    apps = GaiaApps(mc)
-    data_layer = GaiaData(mc)
-    lockscreen = LockScreen(mc)
-
-    lockscreen.unlock()
-    apps.kill_all()
-
-    if args.wifi_ssid:
-        print 'Configuring WiFi'
-        if not args.wifi_key or not args.wifi_pass:
-            args.error('Missing --wifi_key or --wifi_pass option')
-        args.wifi_key = args.wifi_key.upper()
-
-        data_layer.enable_wifi()
-        if args.wifi_key == 'WPA-PSK':
-            pass_key = 'psk'
-        elif args.wifi_key == 'WEP':
-            pass_key = 'wep'
-        else:
-            args.error('not sure what key to use for %r' % args.wifi_key)
-
-        data = {'ssid': args.wifi_ssid, 'keyManagement': args.wifi_key,
-                pass_key: args.wifi_pass}
-        data_layer.connect_to_wifi(data)
-
-    for manifest in args.apps:
-        # There is probably a way easier way to do this by adb pushing
-        # something. Send me a patch!
-        mc.switch_to_frame()
+    def install_apps():
+        mc = get_marionette(args)
+        device = GaiaDevice(mc)
         try:
-            data = requests.get(manifest).json()
-            app_name = data['name']
-            all_apps = set(a['manifest']['name'] for a in get_installed(apps))
-            if app_name not in all_apps:
-                print 'Installing %s from %s' % (app_name, manifest)
-                mc.execute_script('navigator.mozApps.install("%s");' % manifest)
-                wait_for_element_displayed(mc, 'id', 'app-install-install-button')
-                mc.find_element('id', 'app-install-install-button').tap()
-                wait_for_element_not_displayed(mc, 'id', 'app-install-install-button')
+            device.restart_b2g()
+            print 'Your device is rebooting.'
+        except Exception:
+            print ' ** Check to make sure you don\'t have desktop B2G running'
+            raise
 
-                # confirm that app got installed
-                homescreen_frame = mc.find_element(*('css selector',
-                                                   'div.homescreen iframe'))
-                mc.switch_to_frame(homescreen_frame)
-                _app_icon_locator = ('xpath', "//li[@class='icon']//span[text()='%s']" % app_name)
-                try:
-                    mc.find_element(*_app_icon_locator)
-                except NoSuchElementException:
-                    args.error('Error: app could not be installed.')
+        apps = GaiaApps(mc)
+        apps.kill_all()
 
-        except Exception, exc:
-            print ' ** installing manifest %s failed (maybe?)' % manifest
-            print ' ** error: %s: %s' % (exc.__class__.__name__, exc)
-            continue
+        lockscreen = LockScreen(mc)
+        lockscreen.unlock()
 
-    if args.custom_prefs and os.path.exists(args.custom_prefs):
+        if args.wifi_ssid:
+            print 'Configuring WiFi'
+            if not args.wifi_key or not args.wifi_pass:
+                args.error('Missing --wifi_key or --wifi_pass option')
+            args.wifi_key = args.wifi_key.upper()
+
+            data_layer = GaiaData(mc)
+            data_layer.enable_wifi()
+            if args.wifi_key == 'WPA-PSK':
+                pass_key = 'psk'
+            elif args.wifi_key == 'WEP':
+                pass_key = 'wep'
+            else:
+                args.error('not sure what key to use for %r' % args.wifi_key)
+
+            data = {'ssid': args.wifi_ssid, 'keyManagement': args.wifi_key,
+                    pass_key: args.wifi_pass}
+            data_layer.connect_to_wifi(data)
+
+        # disconnect marionette client because install_app would need it
+        mc.client.close()
+        
+        # install apps one by one
+        for manifest in args.apps:
+            args.manifest = manifest
+            args.app = None
+            install_app(args)
+
+    def push_custom_prefs():
         print 'Pushing custom prefs from %s' % args.custom_prefs
         sh('adb shell stop b2g')
         try:
             sh('adb push "%s" /data/local/user.js' % args.custom_prefs)
         finally:
             sh('adb shell start b2g')
+            print 'Your device is rebooting.'
 
-    print 'Your device is rebooting'
+    if args.apps is not None:
+        install_apps()
+
+    if args.custom_prefs and os.path.exists(args.custom_prefs):
+        push_custom_prefs()
 
 
 def http_log_restart(args):
