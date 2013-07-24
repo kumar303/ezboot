@@ -539,10 +539,10 @@ def setup_certs(args):
 def install_marketplace(args):
     # install marketplace dev
     def install_dev():
-        args.app = 'Marketplace Dev'
-        args.browser = True
-        args.manifest = None
+        args.app_url = 'https://marketplace-dev.allizom.org/app/marketplace'
         args.prod = False
+        args.app = None
+        args.manifest = None
 
         install_app(args)
 
@@ -571,9 +571,10 @@ def install_app(args):
     _loading_fragment_locator = ('css selector', 'div#splash-overlay')
     _search_locator = ('id', 'search-q')
 
-    if not args.app and not args.manifest:
-        args.error('Provide either app name (using --app) or URL of app\'s '
-                   'manifest file (using --manifest).')
+    if not args.app and not args.manifest and not args.app_url:
+        args.error('Provide either app name (using --app), URL of app\'s '
+                   'manifest file (using --manifest) or URL of the app '
+                   'on marketpalce (using --app_url).')
 
     mc = get_marionette(args)
     lockscreen = LockScreen(mc)
@@ -601,6 +602,10 @@ def install_app(args):
         marketplace_app = 'Marketplace Dev'
         marketplace_url = 'https://marketplace-dev.allizom.org/'
 
+    if args.app_url:
+        args.browser = True
+        marketplace_url = args.app_url
+
     # apps.kill_all()
     if args.browser:
         browser = Browser(mc)
@@ -624,17 +629,23 @@ def install_app(args):
         if args.prod:
             marketplace.switch_to_marketplace_frame()
 
-    try:
-        marketplace.wait_for_element_displayed(*_search_locator)
-        results = marketplace.search(args.app)
-    except NoSuchElementException, exc:
-        print '** %s: %s' % (exc.__class__.__name__, exc)
-        args.error(no_internet_error)
+    if not args.app_url:
+        try:
+            marketplace.wait_for_element_displayed(*_search_locator)
+            results = marketplace.search(args.app)
+        except NoSuchElementException, exc:
+            print '** %s: %s' % (exc.__class__.__name__, exc)
+            args.error(no_internet_error)
 
-    try:
-        results.search_results[0].tap_install_button()
-    except IndexError:
-        args.error('Error: App not found.')
+        try:
+            results.search_results[0].tap_install_button()
+        except IndexError:
+            args.error('Error: App not found.')
+    else:
+        _install_button_locator = ('css selector', '.button.product.install')
+        marketplace.wait_for_element_displayed(*_install_button_locator)
+        mc.find_element(*_install_button_locator).tap()
+        mc.switch_to_frame()
 
     confirm_installation()
 
@@ -768,6 +779,7 @@ def main():
                                         ' instead of Marketplace Dev.',
                          action='store_true')
     install.add_argument('--manifest', help='Path to manifest file.')
+    install.add_argument('--app_url', help='URL of the app on marketplace.')
     install.set_defaults(func=install_app)
 
     dl = sub_parser('dl', help='Download a build to a custom location')
