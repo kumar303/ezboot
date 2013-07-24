@@ -190,7 +190,7 @@ def set_up_device(args):
 
         # disconnect marionette client because install_app would need it
         mc.client.close()
-        
+
         # install apps one by one
         for manifest in args.apps:
             args.manifest = manifest
@@ -316,15 +316,16 @@ def download_build(args, save_to=None, unzip=True):
         dots = 1
         chars = ['.', ' ']
         bytes_down = 0
+        width = 65  # number of terminal columns
         for chunk in res.iter_content(chunk_size=CHUNK_SIZE):
             bytes_down += CHUNK_SIZE
             zipdest.write(chunk)
             sys.stdout.write("\r%s%s %2.2f%%" % (chars[0] * dots,
-                                         chars[1] * (80 - dots),
+                                         chars[1] * (width - dots),
                                          100.0 * bytes_down / total_bytes))
             sys.stdout.flush()
             dots += 1
-            if dots >= 80:
+            if dots >= width:
                 dots = 1
                 chars.reverse()
         print ''  # finish progress indicator
