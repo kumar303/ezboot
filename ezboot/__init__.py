@@ -39,6 +39,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 CHUNK_SIZE = 1024 * 13
+TERM_WIDTH = 65  # number of terminal columns for progress indicator
 
 
 def user_agrees(prompt='OK? Y/N [%s]: ', default='Y',
@@ -282,6 +283,71 @@ def download_and_save_build(args):
     print 'Your build is available at %s' % zipdest
 
 
+def install_desktop(args):
+    if not args.platform:
+        if sys.platform == 'darwin':
+            args.platform = 'mac64'
+        else:
+            raise NotImplementedError(
+                "Sorry, I'm lazy. Please submit a patch for your "
+                "platform %r." % sys.platform)
+    attr = '%s_url' % args.platform.replace('-', '_')
+    url = getattr(args, attr, None)
+    if not url:
+        raise ValueError(
+            "That's odd, we don't have a URL for your platform. "
+            "Guessed: args.%s" % attr)
+
+    print 'Downloading %s' % url
+    dest = os.path.join(args.work_dir, 'last-desktop-build')
+    if os.path.exists(dest):
+        shutil.rmtree(dest)
+    os.mkdir(dest)
+
+    with pushd(dest):
+        # TODO: librarify this progress code.
+        res = requests.get(url, stream=True)
+        if res.status_code != 200:
+            args.error('Got %s from %s. Try again later maybe'
+                       % (res.status_code, url))
+        total_bytes = int(res.headers['content-length'])
+        filedest = open(os.path.basename(url), 'wb')
+        print 'Saving %s' % filedest.name
+        dots = 1
+        chars = ['.', ' ']
+        bytes_down = 0
+        width = TERM_WIDTH
+        with filedest as fp:
+            for chunk in res.iter_content(chunk_size=CHUNK_SIZE):
+                bytes_down += CHUNK_SIZE
+                fp.write(chunk)
+                sys.stdout.write("\r%s%s %2.2f%%"
+                                 % (chars[0] * dots,
+                                    chars[1] * (width - dots),
+                                    100.0 * bytes_down / total_bytes))
+                sys.stdout.flush()
+                dots += 1
+                if dots >= width:
+                    dots = 1
+                    chars.reverse()
+            print ''  # finish progress indicator
+
+        if args.platform == 'mac64':
+            sh('hdiutil mount %s' % filedest.name)
+            sh('cp -r /Volumes/B2G/B2G.app ./')
+            sh('hdiutil unmount /Volumes/B2G/')
+            os.unlink(filedest.name)
+
+            print 'NOTE: you still need to build a Gaia profile'
+            print 'Ready to run: '
+            print ('%s/B2G.app/Contents/MacOS/b2g-bin -jsconsole -profile ...'
+                   % os.path.abspath(dest))
+        else:
+            raise NotImplementedError(
+                'Not sure how to install for your platform %r'
+                % args.platform)
+
+
 def download_build(args, save_to=None, unzip=True):
     print 'Downloading %s' % args.flash_url
 
@@ -316,7 +382,7 @@ def download_build(args, save_to=None, unzip=True):
         dots = 1
         chars = ['.', ' ']
         bytes_down = 0
-        width = 65  # number of terminal columns
+        width = TERM_WIDTH
         for chunk in res.iter_content(chunk_size=CHUNK_SIZE):
             bytes_down += CHUNK_SIZE
             zipdest.write(chunk)
@@ -723,6 +789,22 @@ def main():
     reflash = sub_parser('reflash', help='Re-flash the last build you '
                                          'downloaded')
     reflash.set_defaults(func=flash_last_dl)
+
+    desktop = sub_parser('desktop', help='Downloads and installs desktop b2g')
+    desktop.set_defaults(func=install_desktop)
+    desktop.add_argument('--platform',
+                         help='Your desktop platform. This option overrides '
+                              'the auto-detected choice.',
+                         choices=['mac64', 'linux-i686', 'linux-x86_64', 'win32'])
+    base_url = 'http://ftp.mozilla.org/pub/mozilla.org/b2g/nightly/latest-mozilla-b2g18'
+    desktop.add_argument('--mac64-url', help='64-bit Mac OS X B2G URL',
+                         default='%s/b2g-18.0.multi.mac64.dmg' % base_url)
+    desktop.add_argument('--linux-i686-url', help='Linux i686 B2G URL',
+                         default='%s/b2g-18.0.multi.linux-i686.tar.bz2' % base_url)
+    desktop.add_argument('--linux-x86_64-url', help='Linux x86_64 B2G URL',
+                         default='%s/b2g-18.0.multi.linux-x86_64.tar.bz2' % base_url)
+    desktop.add_argument('--win32-url', help='32-bit Windows B2G URL',
+                         default='%s/b2g-18.0.multi.win32.zip' % base_url)
 
     setup = sub_parser('setup', help='Set up a flashed device for usage')
     setup.add_argument('--wifi_ssid', help='WiFi SSID to connect to')
