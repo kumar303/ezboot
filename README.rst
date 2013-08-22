@@ -162,7 +162,7 @@ Here is a full reference::
 With the default args it will grab the latest B2G18 build.
 If you need to install a different build just set the platform
 specific URL. For example, if you are on a Mac and you want to get 1.0.1,
-set this:
+set this::
 
     ezboot desktop --mac64-url http://ftp.mozilla.org/pub/mozilla.org/b2g/nightly/latest-mozilla-b2g18_v1_0_1/b2g-18.0.multi.mac64.dmg
 
