@@ -19,7 +19,9 @@ import argparse
 import ConfigParser
 from contextlib import contextmanager
 from getpass import getpass
+import netifaces
 import os
+import pprint
 import socket
 import shutil
 import subprocess
@@ -217,8 +219,38 @@ def set_up_device(args):
 
 
 def do_bind(args):
+    if args.show_net:
+        pp = pprint.PrettyPrinter(indent=4)
+        for int_ in netifaces.interfaces():
+            print
+            print int_
+            addr = {}
+            for fam, data in netifaces.ifaddresses(int_).items():
+                addr[netifaces.address_families[fam]] = data
+            pp.pprint(addr)
+        print
+        return
+
     if not args.bind_ip:
-        args.bind_ip = socket.gethostbyname(socket.gethostname())
+        # Guess the IP.
+        try:
+            families = netifaces.ifaddresses(args.bind_int)
+        except ValueError, exc:
+            args.error('Invalid interface --bind_int={int}; {exc}'
+                       .format(int=args.bind_int, exc=exc))
+        if netifaces.AF_INET not in families:
+            args.error('Could not find AF_INET in families. Are you connected '
+                       'to the Internet through interface {int}? '
+                       'families: {fam}'.format(fam=families, int=args.bind_int))
+        binds = families[netifaces.AF_INET]
+        if len(binds) > 1:
+            args.error('Too many binds: {binds}. Not sure which IP to use. '
+                       'Try --show_net and --bind_ip'
+                       .format(binds=binds))
+        else:
+            # Get the first broadcasted IP.
+            args.bind_ip = binds[0]['addr']
+
     print 'About to bind host {host} on device to IP {ip}'.format(
             host=args.bind_host, ip=args.bind_ip)
     td = tempfile.mkdtemp()
@@ -847,6 +879,11 @@ def main():
                       default='fireplace.local')
     bind.add_argument('--bind_ip', help='IP to bind to. If empty, the IP '
                                         'will be discovered.')
+    bind.add_argument('--bind_int', help='Network interface to guess an IP from',
+                      default='en0')
+    bind.add_argument('--show_net',
+                      help='Show network info but do not bind anything.',
+                      action='store_true')
 
     setup = sub_parser('setup', help='Set up a flashed device for usage')
     setup.add_argument('--wifi_ssid', help='WiFi SSID to connect to')

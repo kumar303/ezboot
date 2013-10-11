@@ -174,7 +174,16 @@ because the default, such as::
 
     python manage.py runserver localhost:8000
 
-Will not bind to your public IP.
+will not bind to your public IP.
+
+If you have multiple IP addresses ezboot probably won't be able to
+guess the right one. Find all of them like this::
+
+    ezboot bind --show_net
+
+And set an IP to bind like this::
+
+    ezboot bind --bind_ip=...
 
 desktop
 -------
