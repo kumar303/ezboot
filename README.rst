@@ -151,6 +151,31 @@ commonly used option values.
 Commands
 ========
 
+bind
+----
+
+This binds a hostname on your B2G device to the local IP address of the
+workstation that you are running ezboot from. Reference::
+
+    ezboot bind --help
+
+The use case here is that you want to connect to http://fireplace.local
+or some URL on your phone and access a development server running at
+http://0.0.0.0:80/ on your workstation.
+
+If you have trouble connecting make sure your mobile device is on the same
+network (you probably need WiFi for that) and that your development
+server is bound to your public IP.
+If it's a Django app, make sure you start with something like this::
+
+    python manage.py runserver 0.0.0.0:8000
+
+because the default, such as::
+
+    python manage.py runserver localhost:8000
+
+Will not bind to your public IP.
+
 desktop
 -------
 

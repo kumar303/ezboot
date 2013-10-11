@@ -25,6 +25,7 @@ import shutil
 import subprocess
 from subprocess import check_call
 import sys
+import tempfile
 import time
 import traceback
 import xml.etree.ElementTree as ET
@@ -50,6 +51,7 @@ def user_agrees(prompt='OK? Y/N [%s]: ', default='Y',
     default = default.lower() if lower_value else default
     if val == default or val == '':
         return True
+
 
 def sh(cmd):
     return check_call(cmd, shell=True)
@@ -212,6 +214,38 @@ def set_up_device(args):
 
     if args.custom_prefs and os.path.exists(args.custom_prefs):
         push_custom_prefs()
+
+
+def do_bind(args):
+    if not args.bind_ip:
+        args.bind_ip = socket.gethostbyname(socket.gethostname())
+    print 'About to bind host {host} on device to IP {ip}'.format(
+            host=args.bind_host, ip=args.bind_ip)
+    td = tempfile.mkdtemp()
+    try:
+        with pushd(td):
+            sh('adb remount')
+            sh('adb pull /system/etc/hosts ./')
+            with open('./hosts') as f:
+                lines = f.readlines()
+                newlines = []
+                for ln in lines:
+                    if (ln.strip().endswith(args.bind_host) or
+                        ln.startswith('# ezboot:')):
+                        # Remove the old IP binding and comments.
+                        continue
+                    newlines.append(ln)
+                newlines.append('# ezboot: bind command added this:\n')
+                newlines.append('{ip}\t\t    {host}\n'
+                                .format(ip=args.bind_ip,
+                                        host=args.bind_host))
+
+            with open('./new-hosts', 'w') as f:
+                f.write(''.join(newlines))
+            sh('adb push ./new-hosts /system/etc/hosts')
+    finally:
+        shutil.rmtree(td)
+    print 'Great success'
 
 
 def http_log_restart(args):
@@ -805,6 +839,14 @@ def main():
                          default='%s/b2g-18.0.multi.linux-x86_64.tar.bz2' % base_url)
     desktop.add_argument('--win32-url', help='32-bit Windows B2G URL',
                          default='%s/b2g-18.0.multi.win32.zip' % base_url)
+
+    bind = sub_parser('bind', help='Bind a hostname on your mobile device '
+                                   'to your local server')
+    bind.set_defaults(func=do_bind)
+    bind.add_argument('--bind_host', help='hostname',
+                      default='fireplace.local')
+    bind.add_argument('--bind_ip', help='IP to bind to. If empty, the IP '
+                                        'will be discovered.')
 
     setup = sub_parser('setup', help='Set up a flashed device for usage')
     setup.add_argument('--wifi_ssid', help='WiFi SSID to connect to')
