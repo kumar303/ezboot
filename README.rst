@@ -176,14 +176,21 @@ because the default, such as::
 
 will not bind to your public IP.
 
-If you have multiple IP addresses ezboot probably won't be able to
-guess the right one. Find all of them like this::
+If you have multiple interfaces `ezboot bind` will show you the possibilities
+so you can choose one from the list of options.
 
-    ezboot bind --show_net
+Should you want to always use a specific interface then you can use::
 
-And set an IP to bind like this::
+    ezboot bind --bind_int=...
+
+Alternatively if you want to set a specific IP you can do so like this::
 
     ezboot bind --bind_ip=...
+
+and the same for host::
+
+    ezboot bind --bind_host=...
+
 
 desktop
 -------
