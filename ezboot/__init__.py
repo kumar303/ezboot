@@ -55,6 +55,37 @@ def user_agrees(prompt='OK? Y/N [%s]: ', default='Y',
         return True
 
 
+def select(choices, default=1, prompt='Please choose from the following [1]:'):
+    """Create a prompt similar to select in bash."""
+
+    invalid_choice = 'Not a valid choice. Try again.'
+
+    for i, value in enumerate(choices):
+        print '%s) %s' % (i+1, value[0])
+
+    def get_choice():
+        try:
+            val = raw_input(prompt)
+            if val == '':
+                val = default
+            val = int(val) - 1
+        except ValueError:
+            print invalid_choice
+            return get_choice()
+        except KeyboardInterrupt:
+            print
+            print "Bailing..."
+            sys.exit(1)
+
+        try:
+            return choices[val]
+        except IndexError:
+            print invalid_choice
+            return get_choice()
+
+    return get_choice()
+
+
 def sh(cmd):
     return check_call(cmd, shell=True)
 
@@ -218,40 +249,66 @@ def set_up_device(args):
         push_custom_prefs()
 
 
+def get_ips_for_interface(interface):
+    """Get the ips for a specific interface."""
+    interface_ips = []
+    try:
+        for fam, data in netifaces.ifaddresses(interface).items():
+            if fam == socket.AF_INET:
+                for d in data:
+                    ip = d.get('addr')
+                    if ip and not ip.startswith('127'):
+                        interface_ips.append((interface, ip))
+        return interface_ips
+    except ValueError, e:
+        print >> sys.stderr, e
+        print >> sys.stderr, 'You provided "%s". Choose one of:' % interface
+        print >> sys.stderr, ', '.join(netifaces.interfaces())
+        sys.exit(1)
+
+
+def get_interface_data(interface=None):
+    """Get interface data for one or more interfaces.
+    Returns data for all useful interfaces if no specific interface is provided.
+
+    """
+    if interface:
+        interface_ips = get_ips_for_interface(interface)
+    else:
+        interface_ips = []
+        for int_ in netifaces.interfaces():
+            interface_ips += get_ips_for_interface(int_)
+    return sorted(interface_ips, key=lambda tup: tup[1])
+
+
 def do_bind(args):
     if args.show_net:
-        pp = pprint.PrettyPrinter(indent=4)
-        for int_ in netifaces.interfaces():
-            print
-            print int_
-            addr = {}
-            for fam, data in netifaces.ifaddresses(int_).items():
-                addr[netifaces.address_families[fam]] = data
-            pp.pprint(addr)
-        print
+        interface_ips = get_interface_data()
+        choices = []
+        for interface, ip_addr in interface_ips:
+            print '%s (%s)' % (ip_addr, interface)
         return
 
     if not args.bind_ip:
         # Guess the IP.
-        try:
-            families = netifaces.ifaddresses(args.bind_int)
-        except ValueError, exc:
-            args.error('Invalid interface --bind_int={int}; {exc}'
-                       .format(int=args.bind_int, exc=exc))
-        if netifaces.AF_INET not in families:
-            args.error('Could not find AF_INET in families. Are you connected '
-                       'to the Internet through interface {int}? '
-                       'families: {fam}'.format(fam=families, int=args.bind_int))
-        binds = families[netifaces.AF_INET]
-        if len(binds) > 1:
-            args.error('Too many binds: {binds}. Not sure which IP to use. '
-                       'Try --show_net and --bind_ip'
-                       .format(binds=binds))
-        else:
-            # Get the first broadcasted IP.
-            args.bind_ip = binds[0]['addr']
+        interfaces = get_interface_data(args.bind_int)
+        if not interfaces:
+            args.error('No useable interfaces found. Are you connected '
+                       'to a network that your device will be able to "see"?')
+        if len(interfaces) > 1:
+            prompt = 'Not sure which IP to use. Please select one [1]:'
+            interface_ips = get_interface_data()
+            choices = []
+            for interface, ip_addr in interface_ips:
+                choices.append(('%s (%s)' % (ip_addr, interface), ip_addr))
 
-    print 'About to bind host {host} on device to IP {ip}'.format(
+            choice = select(choices, prompt=prompt)
+            args.bind_ip = choice[1]
+        else:
+            # Get the only ip we found.
+            args.bind_ip = interfaces[0][1]
+
+    print 'About to bind host "{host}" on device to IP "{ip}"'.format(
             host=args.bind_host, ip=args.bind_ip)
     td = tempfile.mkdtemp()
     try:
@@ -880,7 +937,7 @@ def main():
     bind.add_argument('--bind_ip', help='IP to bind to. If empty, the IP '
                                         'will be discovered.')
     bind.add_argument('--bind_int', help='Network interface to guess an IP from',
-                      default='en0')
+                      default=None)
     bind.add_argument('--show_net',
                       help='Show network info but do not bind anything.',
                       action='store_true')
