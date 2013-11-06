@@ -358,16 +358,16 @@ You can install certs for the Marketplace dev packaged app like this::
 
    ezboot mkt_certs --dev --certs_path ~/Downloads/certdb.tmp/
 
-This command requires a device id unless you are using a unagi.You can configure this
-like so::
+This command requires a device id unless you are using a unagi.
+You can configure this like so::
 
   [flash]
   flash_device = <device>
   flash_device_id = <whatever is reported by adb devices>
 
-If you're using an inari or the device identifier looks like a mac address it
-will likely fail. If you have problems, if you run: `adb devices -l` and use
-the string prefixed with `usb:` as the `flash_device_id` this command should work fine::
+If you're using an inari or if the device identifier looks like a mac address it
+will likely fail. If you have problems, run: ``adb devices -l`` and use
+the string prefixed with ``usb:`` as the ``flash_device_id``. For example::
 
    ezboot mkt_certs --flash_device_id 'usb:1D111300' --dev --certs_path ~/Downloads/certdb.tmp/
 
