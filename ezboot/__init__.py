@@ -25,7 +25,7 @@ import pprint
 import socket
 import shutil
 import subprocess
-from subprocess import check_call
+from subprocess import check_call, check_output
 import sys
 import tempfile
 import time
@@ -88,6 +88,10 @@ def select(choices, default=1, prompt='Please choose from the following [1]:'):
 
 def sh(cmd):
     return check_call(cmd, shell=True)
+
+
+def sh_output(cmd):
+    return check_output(cmd, shell=True)
 
 
 def wait_for_element_displayed(mc, by, locator, timeout=10):
@@ -672,10 +676,21 @@ def do_login(args):
 
 
 def setup_certs(args):
-    # TODO get rid of this and work out a solution for inari as well.
-    if args.flash_device.lower() != 'unagi':
-        raise NotImplementedError('Certs can only be installed on unagi right '
-                                  'now.')
+    device_id = args.flash_device_id
+
+    # The device string for unagis is fixed.
+    if args.flash_device.lower() == 'unagi' and not device_id:
+        device_id = 'full_unagi'
+
+    # Check connected devices to be sure.
+    devices = sh_output('adb devices -l')
+
+    if device_id not in devices or not device_id:
+        raise ValueError('Check your device string using '
+                         '"adb devices -l" and put it in your '
+                         'ini file as flash_device_id. if you have '
+                         'problems use the string prefixed with '
+                         '"usb:"')
 
     def setup_dev():
         certs_path = os.path.abspath(args.certs_path)
@@ -695,10 +710,10 @@ def setup_certs(args):
                     sh('git pull')
 
             with pushd(path):
-                sh('./change_trusted_servers.sh full_unagi '
-                   '"https://marketplace-dev.allizom.org,'
-                   'https://marketplace.firefox.com"')
-                sh('./push_certdb.sh full_unagi %s' % certs_path)
+                sh("./change_trusted_servers.sh '%s' "
+                   "'https://marketplace-dev.allizom.org,"
+                   "https://marketplace.firefox.com'" % device_id)
+                sh("./push_certdb.sh '%s' %s" %  (device_id, certs_path))
             sh('adb reboot')
 
     if args.env is None:
@@ -887,6 +902,9 @@ def main():
                           'empty')
     cmd.add_argument('--flash_device', default=None,
                      help='The device you want to flash. Example: unagi')
+    cmd.add_argument('--flash_device_id', default=None,
+                     help='The device identifier as reported by adb devices -l (usb:<blah>)')
+
 
     sub = cmd.add_subparsers(help='sub-command help')
 
