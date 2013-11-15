@@ -377,9 +377,9 @@ SHELL
 def flash_device(args):
     default_build_urls = {
         'unagi': ('https://pvtbuilds.mozilla.org/pub/mozilla.org/b2g/nightly'
-                  '/mozilla-b2g18_v1_0_1-unagi-eng/latest/unagi.zip'),
-        'inari': ('https://pvtbuilds.mozilla.org/pvt/mozilla.org/b2gotoro'
-                  '/nightly/mozilla-b2g18_v1_0_1-inari-eng/latest/inari.zip'),
+                  '/mozilla-b2g18-unagi-eng/latest/unagi.zip'),
+        'inari': ('https://pvtbuilds.mozilla.org/pvt/mozilla.org/b2gotoro/nightly'
+                  '/mozilla-b2g18-inari-eng/latest/inari.zip'),
     }
 
     if args.flash_device is None and args.flash_url is None:
