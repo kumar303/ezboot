@@ -40,9 +40,15 @@ from marionette.errors import NoSuchElementException, StaleElementException
 from marionette.errors import TimeoutException
 import requests
 from requests.auth import HTTPBasicAuth
+from termcolor import cprint
 
 CHUNK_SIZE = 1024 * 13
 TERM_WIDTH = 65  # number of terminal columns for progress indicator
+
+
+def warning(text):
+    """Warning text."""
+    cprint('WARNING: %s' % text, 'magenta', attrs=['bold'])
 
 
 def user_agrees(prompt='OK? Y/N [%s]: ', default='Y',
@@ -871,15 +877,19 @@ class Formatter(argparse.RawDescriptionHelpFormatter,
 def main():
     conf_parser = argparse.ArgumentParser(add_help=False)
     conf_parser.add_argument('-c', '--config',
-                             default=os.path.join(os.getcwd(), 'ezboot.ini'),
+                             default=os.path.join(os.getcwd(), 'ezboot1.ini'),
                              help='Set argument defaults from config file')
 
     args, remaining_argv = conf_parser.parse_known_args()
+    ezboot_conf = args.config
+    if not ezboot_conf or not os.path.exists(ezboot_conf):
+        warning('Falling back to use ezboot.ini. Using ezboot1.ini is recommended.')
+        ezboot_conf = os.path.join(os.getcwd(), 'ezboot.ini')
 
     config = None
-    if args.config and os.path.exists(args.config):
+    if ezboot_conf and os.path.exists(ezboot_conf):
         config = ConfigParser.SafeConfigParser()
-        config.read([args.config])
+        config.read([ezboot_conf])
 
     cmd = argparse.ArgumentParser(description=__doc__,
                                   parents=[conf_parser],
@@ -1035,7 +1045,7 @@ def main():
     args = cmd.parse_args(remaining_argv)
 
     if config:
-        print 'Using config: %s' % args.config
+        print 'Using config: %s' % ezboot_conf
     if not find_executable('adb'):
         cmd.error("""adb not found on $PATH
 

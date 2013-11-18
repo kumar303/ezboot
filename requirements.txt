@@ -2,3 +2,4 @@ marionette_client == 0.5.37
 gaiatest == 0.17
 netifaces >= 0.8
 requests >= 1.1.0
+termcolor == 1.1.0
