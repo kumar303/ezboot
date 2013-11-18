@@ -65,13 +65,19 @@ Contents:
 Install
 =======
 
-With `pip`_, run this::
+You need `pip`_ to install ezboot.
+For B2G versions 1.2 and greater, install the current version::
 
     pip install ezboot
 
-This pulls in some dependencies so you may want to use a common
-`virtualenv`_ and adjust your ``$PATH`` so you can use ``ezboot`` for
-any project, e.g. ``/path/to/.virtualenvs/ezboot/bin``.
+For older B2G versions, install the 1.0 version::
+
+    pip install ezboot1
+
+The installation process pulls in some dependencies so you may want to
+use a common `virtualenv`_ and adjust your ``$PATH`` so you can
+use ``ezboot`` for any project,
+e.g. ``/path/to/.virtualenvs/ezboot/bin``.
 
 To install from source::
 
