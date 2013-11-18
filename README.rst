@@ -79,6 +79,9 @@ use a common `virtualenv`_ and adjust your ``$PATH`` so you can
 use ``ezboot`` for any project,
 e.g. ``/path/to/.virtualenvs/ezboot/bin``.
 
+*WARNING*: If you want to run both ``ezboot1`` and ``ezboot`` on your system
+you must install each within a `virtualenv`_.
+
 To install from source::
 
    git clone git://github.com/kumar303/ezboot.git
