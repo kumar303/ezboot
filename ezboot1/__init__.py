@@ -884,7 +884,7 @@ def main():
     cmd = argparse.ArgumentParser(description=__doc__,
                                   parents=[conf_parser],
                                   formatter_class=Formatter)
-    cmd.add_argument('--work_dir', default='~/.ezboot',
+    cmd.add_argument('--work_dir', default='~/.ezboot1',
                      help='Working directory to save/delete temp data')
     cmd.add_argument('--adb_port', default=2828, type=int,
                      help='adb port to forward on the device. '

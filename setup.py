@@ -7,8 +7,8 @@ def local_file(fn):
     return open(os.path.join(os.path.dirname(__file__), fn))
 
 
-setup(name='ezboot',
-      version='1.1.8',
+setup(name='ezboot1',
+      version='1.1.9',
       description="Automatically configure a Boot2Gecko Device. It's so ez!",
       long_description=local_file('README.rst').read(),
       author='Kumar McMillan',
@@ -19,7 +19,7 @@ setup(name='ezboot',
       classifiers=[],
       entry_points="""
           [console_scripts]
-          ezboot = ezboot:main
+          ezboot1 = ezboot1:main
           """,
       packages=find_packages(exclude=['tests']),
       install_requires=[ln.strip() for ln in
