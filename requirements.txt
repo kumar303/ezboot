@@ -1,3 +1,4 @@
+marionette_client == 0.5.36
 gaiatest == 0.17
 netifaces >= 0.8
 requests >= 1.1.0
