@@ -55,6 +55,12 @@ def user_agrees(prompt='OK? Y/N [%s]: ', default='Y',
         return True
 
 
+def adb_not_required(fn):
+    """Decorator to say that this command function doesn't require adb."""
+    fn.requires_adb = False
+    return fn
+
+
 def select(choices, default=1, prompt='Please choose from the following [1]:'):
     """Create a prompt similar to select in bash."""
 
@@ -410,6 +416,7 @@ def download_and_save_build(args):
     print 'Your build is available at %s' % zipdest
 
 
+@adb_not_required
 def install_desktop(args):
     if not args.platform:
         if sys.platform == 'darwin':
@@ -473,8 +480,6 @@ def install_desktop(args):
             raise NotImplementedError(
                 'Not sure how to install for your platform %r'
                 % args.platform)
-
-install_desktop.requires_adb = False
 
 
 def download_build(args, save_to=None, unzip=True):

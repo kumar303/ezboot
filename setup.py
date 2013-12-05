@@ -8,7 +8,7 @@ def local_file(fn):
 
 
 setup(name='ezboot',
-      version='2.0.0',
+      version='2.0.1',
       description="Automatically configure a Boot2Gecko Device. It's so ez!",
       long_description=local_file('README.rst').read(),
       author='Kumar McMillan',
