@@ -692,7 +692,7 @@ def setup_certs(args):
     # Check connected devices to be sure.
     devices = sh_output('adb devices -l')
 
-    if device_id not in devices or not device_id:
+    if not device_id or device_id not in devices:
         raise ValueError('Check your device string using '
                          '"adb devices -l" and put it in your '
                          'ini file as flash_device_id. if you have '
